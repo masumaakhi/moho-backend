@@ -1,0 +1,708 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                         String          @id @default(uuid()) @db.Uuid
+  name                       String?
+  email                      String?         @unique
+  phone                      String?         @unique
+  password_hash              String?
+  google_id                  String?         @unique
+  avatar_url                 String?
+  status                     UserStatus      @default(active)
+  last_login_at              DateTime?
+  account_type               AccountType     @default(normal)
+  is_password_set            Boolean         @default(false)
+  auto_created_from_order_id String?         @db.Uuid
+  created_at                 DateTime        @default(now())
+  updated_at                 DateTime        @updatedAt
+  deleted_at                 DateTime?
+  is_email_verified          Boolean         @default(false)
+  customer                   Customer?
+  orders                     Order[]
+  password_resets            PasswordReset[]
+  reviews                    ProductReview[]
+  refresh_tokens             RefreshToken[]
+
+  @@map("users")
+}
+
+model Customer {
+  id                   String            @id @default(uuid()) @db.Uuid
+  user_id              String            @unique @db.Uuid
+  name                 String?
+  phone                String?
+  email                String?
+  address              String?
+  source_type          String?
+  first_order_id       String?           @db.Uuid
+  account_completed_at DateTime?
+  is_watchlisted       Boolean           @default(false)
+  is_blocked           Boolean           @default(false)
+  total_orders         Int               @default(0)
+  total_spend          Decimal           @default(0) @db.Decimal(12, 2)
+  status               String?           @default("active")
+  created_at           DateTime          @default(now())
+  updated_at           DateTime          @updatedAt
+  deleted_at           DateTime?
+  mohul_cash           Decimal           @default(0) @db.Decimal(12, 2)
+  addresses            CustomerAddress[]
+  notes                CustomerNote[]
+  user                 User              @relation(fields: [user_id], references: [id])
+  orders               Order[]
+  product_reviews      ProductReview[]
+
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id          String   @id @default(uuid()) @db.Uuid
+  customer_id String   @db.Uuid
+  address     String
+  area_city   String?
+  is_default  Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  customer    Customer @relation(fields: [customer_id], references: [id])
+
+  @@map("customer_addresses")
+}
+
+model CustomerNote {
+  id          String   @id @default(uuid()) @db.Uuid
+  customer_id String   @db.Uuid
+  admin_id    String?  @db.Uuid
+  note        String
+  created_at  DateTime @default(now())
+  customer    Customer @relation(fields: [customer_id], references: [id])
+
+  @@map("customer_notes")
+}
+
+model AdminUser {
+  id             String         @id @default(uuid()) @db.Uuid
+  name           String
+  email          String         @unique
+  phone          String?
+  password_hash  String
+  status         AdminStatus    @default(active)
+  role_id        String?        @db.Uuid
+  last_login_at  DateTime?
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+  deleted_at     DateTime?
+  role           Role?          @relation(fields: [role_id], references: [id])
+  refresh_tokens RefreshToken[]
+
+  @@map("admin_users")
+}
+
+model Role {
+  id               String           @id @default(uuid()) @db.Uuid
+  name             String           @unique
+  description      String?
+  is_system        Boolean          @default(false)
+  status           String           @default("active")
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  deleted_at       DateTime?
+  admins           AdminUser[]
+  role_permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id               String           @id @default(uuid()) @db.Uuid
+  name             String           @unique
+  code             String           @unique
+  description      String?
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  role_permissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id            String     @id @default(uuid()) @db.Uuid
+  role_id       String     @db.Uuid
+  permission_id String     @db.Uuid
+  created_at    DateTime   @default(now())
+  permission    Permission @relation(fields: [permission_id], references: [id])
+  role          Role       @relation(fields: [role_id], references: [id])
+
+  @@unique([role_id, permission_id])
+  @@map("role_permissions")
+}
+
+model RefreshToken {
+  id            String     @id @default(uuid()) @db.Uuid
+  token_hash    String
+  scope         TokenScope
+  user_id       String?    @db.Uuid
+  admin_user_id String?    @db.Uuid
+  expires_at    DateTime
+  revoked_at    DateTime?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+  admin_user    AdminUser? @relation(fields: [admin_user_id], references: [id])
+  user          User?      @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([admin_user_id])
+  @@map("refresh_tokens")
+}
+
+model PasswordReset {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  token_hash String
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+  user       User      @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@map("password_resets")
+}
+
+model Order {
+  id                      String                @id @default(uuid()) @db.Uuid
+  order_number            String                @unique
+  user_id                 String?               @db.Uuid
+  customer_id             String?               @db.Uuid
+  customer_name           String?
+  customer_phone          String?
+  customer_email          String?
+  shipping_address        String?
+  payment_method          String?
+  payment_status          String?               @default("unpaid")
+  order_status            String?               @default("pending")
+  subtotal                Decimal?              @db.Decimal(12, 2)
+  discount_amount         Decimal?              @db.Decimal(12, 2)
+  delivery_charge         Decimal?              @db.Decimal(12, 2)
+  total_amount            Decimal?              @db.Decimal(12, 2)
+  is_guest_order          Boolean               @default(false)
+  auto_account_created    Boolean               @default(false)
+  account_created_user_id String?               @db.Uuid
+  order_source_type       String?
+  created_at              DateTime              @default(now())
+  updated_at              DateTime              @updatedAt
+  deleted_at              DateTime?
+  delivered_at            DateTime?
+  delivery_bookings       DeliveryBooking[]
+  duplicate_new_matches   DuplicateOrderMatch[] @relation("NewOrder")
+  duplicate_old_matches   DuplicateOrderMatch[] @relation("OldOrder")
+  invoices                Invoice[]
+  order_items             OrderItem[]
+  status_history          OrderStatusHistory[]
+  customer                Customer?             @relation(fields: [customer_id], references: [id])
+  user                    User?                 @relation(fields: [user_id], references: [id])
+  payments                Payment[]
+  suspicious_order        SuspiciousOrder?
+
+  @@index([user_id])
+  @@index([customer_id])
+  @@map("orders")
+}
+
+model Category {
+  id          String     @id @default(uuid()) @db.Uuid
+  parent_id   String?    @db.Uuid
+  name        String
+  slug        String     @unique
+  description String?
+  image_url   String?
+  status      String     @default("active")
+  sort_order  Int        @default(0)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+  parent      Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])
+  children    Category[] @relation("CategoryToCategory")
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id                String           @id @default(uuid()) @db.Uuid
+  category_id       String           @db.Uuid
+  name              String
+  slug              String           @unique
+  sku               String?          @unique
+  short_description String?
+  description       String?
+  base_price        Decimal          @db.Decimal(12, 2)
+  new_price         Decimal?         @db.Decimal(12, 2)
+  stock_quantity    Int              @default(0)
+  status            String           @default("active")
+  is_featured       Boolean          @default(false)
+  is_trending       Boolean          @default(false)
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+  deleted_at        DateTime?
+  how_to_use        String?
+  cost_price        Decimal          @default(0) @db.Decimal(12, 2)
+  cart_items        CartItem[]
+  order_items       OrderItem[]
+  faqs              ProductFAQ[]
+  images            ProductImage[]
+  reviews           ProductReview[]
+  variants          ProductVariant[]
+  category          Category         @relation(fields: [category_id], references: [id])
+
+  @@map("products")
+}
+
+model BusinessExpense {
+  id         String   @id @default(uuid()) @db.Uuid
+  title      String
+  amount     Decimal  @db.Decimal(12, 2)
+  category   String   @default("general")
+  date       DateTime @default(now())
+  notes      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("business_expenses")
+}
+
+model DailyReport {
+  id             String   @id @default(uuid()) @db.Uuid
+  date           DateTime @unique
+  total_orders   Int      @default(0)
+  total_revenue  Decimal  @default(0) @db.Decimal(12, 2)
+  total_cost     Decimal  @default(0) @db.Decimal(12, 2)
+  total_profit   Decimal  @default(0) @db.Decimal(12, 2)
+  total_expenses Decimal  @default(0) @db.Decimal(12, 2)
+  net_profit     Decimal  @default(0) @db.Decimal(12, 2)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@map("daily_reports")
+}
+
+model ReportExport {
+  id         String   @id @default(uuid()) @db.Uuid
+  admin_id   String?  @db.Uuid
+  type       String
+  file_url   String
+  date_range String?
+  status     String   @default("completed")
+  created_at DateTime @default(now())
+
+  @@map("report_exports")
+}
+
+model ProductImage {
+  id         String   @id @default(uuid()) @db.Uuid
+  product_id String   @db.Uuid
+  image_url  String
+  alt_text   String?
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  product    Product  @relation(fields: [product_id], references: [id])
+
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id         String     @id @default(uuid()) @db.Uuid
+  product_id String     @db.Uuid
+  name       String
+  value      String
+  sku        String?
+  price      Decimal?   @db.Decimal(12, 2)
+  stock      Int        @default(0)
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+  cart_items CartItem[]
+  product    Product    @relation(fields: [product_id], references: [id])
+
+  @@map("product_variants")
+}
+
+model ProductFAQ {
+  id         String   @id @default(uuid()) @db.Uuid
+  product_id String   @db.Uuid
+  question   String
+  answer     String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  product    Product  @relation(fields: [product_id], references: [id])
+
+  @@map("product_faqs")
+}
+
+model ProductReview {
+  id          String    @id @default(uuid()) @db.Uuid
+  product_id  String    @db.Uuid
+  customer_id String?   @db.Uuid
+  rating      Int
+  comment     String?
+  status      String    @default("pending")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  user_id     String?   @db.Uuid
+  customer    Customer? @relation(fields: [customer_id], references: [id])
+  product     Product   @relation(fields: [product_id], references: [id])
+  user        User?     @relation(fields: [user_id], references: [id])
+
+  @@map("product_reviews")
+}
+
+model HomepageSection {
+  id          String   @id @default(uuid()) @db.Uuid
+  section_key String   @unique
+  title       String?
+  content     String?
+  image_url   String?
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("homepage_sections")
+}
+
+model NewsletterSubscriber {
+  id         String   @id @default(uuid()) @db.Uuid
+  email      String   @unique
+  status     String   @default("active")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("newsletter_subscribers")
+}
+
+model ContactMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  email      String
+  phone      String?
+  message    String
+  status     String   @default("unread")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("contact_messages")
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String?  @db.Uuid
+  action      String
+  entity_type String?
+  entity_id   String?
+  details     Json?
+  created_at  DateTime @default(now())
+  actor_type  String   @default("admin")
+  description String?
+  ip_address  String?
+  module_name String?
+  user_agent  String?
+
+  @@map("activity_logs")
+}
+
+model Notification {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String?  @db.Uuid
+  type       String
+  title      String
+  message    String
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("notifications")
+}
+
+model Cart {
+  id         String     @id @default(uuid()) @db.Uuid
+  user_id    String?    @db.Uuid
+  session_id String?
+  status     String     @default("active")
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+  items      CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id         String          @id @default(uuid()) @db.Uuid
+  cart_id    String          @db.Uuid
+  product_id String          @db.Uuid
+  variant_id String?         @db.Uuid
+  quantity   Int             @default(1)
+  price      Decimal         @db.Decimal(12, 2)
+  created_at DateTime        @default(now())
+  updated_at DateTime        @updatedAt
+  cart       Cart            @relation(fields: [cart_id], references: [id])
+  product    Product         @relation(fields: [product_id], references: [id])
+  variant    ProductVariant? @relation(fields: [variant_id], references: [id])
+
+  @@map("cart_items")
+}
+
+model OrderItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  order_id     String   @db.Uuid
+  product_id   String   @db.Uuid
+  variant_id   String?  @db.Uuid
+  product_name String
+  variant_name String?
+  quantity     Int
+  unit_price   Decimal  @db.Decimal(12, 2)
+  total_price  Decimal  @db.Decimal(12, 2)
+  created_at   DateTime @default(now())
+  order        Order    @relation(fields: [order_id], references: [id])
+  product      Product  @relation(fields: [product_id], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id         String   @id @default(uuid()) @db.Uuid
+  order_id   String   @db.Uuid
+  amount     Decimal  @db.Decimal(12, 2)
+  method     String
+  status     String   @default("pending")
+  trx_id     String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  order      Order    @relation(fields: [order_id], references: [id])
+
+  @@map("payments")
+}
+
+model OrderStatusHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  order_id   String   @db.Uuid
+  status     String
+  notes      String?
+  created_at DateTime @default(now())
+  order      Order    @relation(fields: [order_id], references: [id])
+
+  @@map("order_status_history")
+}
+
+model FraudBlacklistNumber {
+  id         String   @id @default(uuid()) @db.Uuid
+  phone      String   @unique
+  reason     String?
+  created_at DateTime @default(now())
+  is_active  Boolean  @default(true)
+
+  @@map("fraud_blacklist_numbers")
+}
+
+model SuspiciousOrder {
+  id          String   @id @default(uuid()) @db.Uuid
+  order_id    String   @unique @db.Uuid
+  fraud_score Int
+  reasons     Json?
+  status      String   @default("pending_review")
+  created_at  DateTime @default(now())
+  order       Order    @relation(fields: [order_id], references: [id])
+
+  @@map("suspicious_orders")
+}
+
+model DuplicateOrderMatch {
+  id               String   @id @default(uuid()) @db.Uuid
+  new_order_id     String   @db.Uuid
+  old_order_id     String   @db.Uuid
+  match_percentage Int
+  matched_fields   Json?
+  created_at       DateTime @default(now())
+  new_order        Order    @relation("NewOrder", fields: [new_order_id], references: [id])
+  old_order        Order    @relation("OldOrder", fields: [old_order_id], references: [id])
+
+  @@map("duplicate_order_matches")
+}
+
+model Setting {
+  id         String   @id @default(uuid()) @db.Uuid
+  key        String   @unique
+  value      String
+  group      String   @default("general")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model DeliveryBooking {
+  id               String                  @id @default(uuid()) @db.Uuid
+  order_id         String                  @db.Uuid
+  courier_name     String                  @default("pathao")
+  consignment_id   String?
+  tracking_id      String?
+  delivery_status  String                  @default("pending")
+  booking_response Json?
+  retry_count      Int                     @default(0)
+  last_retry_at    DateTime?
+  created_at       DateTime                @default(now())
+  updated_at       DateTime                @updatedAt
+  order            Order                   @relation(fields: [order_id], references: [id])
+  retry_logs       DeliveryRetryLog[]
+  tracking_events  DeliveryTrackingEvent[]
+
+  @@map("delivery_bookings")
+}
+
+model DeliveryTrackingEvent {
+  id         String          @id @default(uuid()) @db.Uuid
+  booking_id String          @db.Uuid
+  status     String
+  location   String?
+  message    String?
+  raw_data   Json?
+  event_time DateTime        @default(now())
+  booking    DeliveryBooking @relation(fields: [booking_id], references: [id])
+
+  @@map("delivery_tracking_events")
+}
+
+model DeliveryRetryLog {
+  id            String          @id @default(uuid()) @db.Uuid
+  booking_id    String          @db.Uuid
+  error_message String
+  retry_number  Int
+  created_at    DateTime        @default(now())
+  booking       DeliveryBooking @relation(fields: [booking_id], references: [id])
+
+  @@map("delivery_retry_logs")
+}
+
+model AutomationJob {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  status      String    @default("pending")
+  payload     Json?
+  result      Json?
+  error_log   String?
+  started_at  DateTime?
+  finished_at DateTime?
+  created_at  DateTime  @default(now())
+
+  @@map("automation_jobs")
+}
+
+model EmailLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  to          String
+  subject     String
+  status      String    @default("pending")
+  error       String?
+  retry_count Int       @default(0)
+  last_retry  DateTime?
+  created_at  DateTime  @default(now())
+
+  @@map("email_logs")
+}
+
+model ReportReceiver {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String?
+  email      String   @unique
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("report_receivers")
+}
+
+model Invoice {
+  id              String    @id @default(uuid()) @db.Uuid
+  order_id        String    @db.Uuid
+  invoice_number  String    @unique
+  invoice_date    DateTime  @default(now())
+  subtotal        Decimal   @db.Decimal(12, 2)
+  discount        Decimal   @default(0) @db.Decimal(12, 2)
+  delivery_charge Decimal   @default(0) @db.Decimal(12, 2)
+  total_amount    Decimal   @db.Decimal(12, 2)
+  status          String    @default("generated")
+  pdf_url         String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+  order           Order     @relation(fields: [order_id], references: [id])
+
+  @@map("invoices")
+}
+
+model Banner {
+  id         String   @id @default(uuid()) @db.Uuid
+  title      String
+  subtitle   String?
+  image_url  String
+  link_url   String?
+  type       String   @default("home_main")
+  status     String   @default("active")
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("banners")
+}
+
+model Testimonial {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String
+  rating           Int      @default(5)
+  text             String
+  avatar_url       String?
+  review_image_url String?
+  is_active        Boolean  @default(true)
+  sort_order       Int      @default(0)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@map("testimonials")
+}
+
+model Announcement {
+  id         String   @id @default(uuid()) @db.Uuid
+  text       String
+  link_url   String?
+  is_active  Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("announcements")
+}
+
+enum UserStatus {
+  active
+  inactive
+  blocked
+}
+
+enum AccountType {
+  normal
+  google
+  guest_auto
+  admin_created
+}
+
+enum AdminStatus {
+  active
+  inactive
+  disabled
+}
+
+enum TokenScope {
+  customer
+  admin
+}
