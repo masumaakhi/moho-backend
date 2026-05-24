@@ -15,25 +15,59 @@ export class AutomationService {
     private reportsService: ReportsService,
   ) {}
 
+  private async runWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
+    let lastError: any;
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        lastError = err;
+        const isTransient = 
+          err.code === 'P1001' || 
+          err.code === 'P1002' || 
+          err.code === 'P1008' || 
+          err.code === 'P1017' ||
+          err.message?.includes('Can\'t reach database server') ||
+          err.message?.includes('Timed out fetching a new connection') ||
+          err.message?.includes('connection pool');
+          
+        if (!isTransient) {
+          throw err;
+        }
+        
+        this.logger.warn(`Database connection failed (try ${i + 1}/${retries}). Retrying in ${delayMs}ms... Error: ${err.message || err}`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        delayMs *= 2; // Exponential backoff
+      }
+    }
+    throw lastError;
+  }
+
   // Check every hour for the scheduled report time
   @Cron(CronExpression.EVERY_HOUR)
   async handleDailyReportCron() {
     this.logger.log('Checking for scheduled daily report...');
     
-    const settings = await this.prisma.setting.findUnique({
-      where: { key: 'report_time' }
-    });
-    
-    const preferredTime = settings?.value || "08:00"; // Default to 8 AM
-    const currentHour = new Date().getHours();
-    const [prefHour] = preferredTime.split(':').map(Number);
+    try {
+      const settings = await this.runWithRetry(() => 
+        this.prisma.setting.findUnique({
+          where: { key: 'report_time' }
+        })
+      );
+      
+      const preferredTime = settings?.value || "08:00"; // Default to 8 AM
+      const currentHour = new Date().getHours();
+      const [prefHour] = preferredTime.split(':').map(Number);
 
-    if (currentHour === prefHour) {
-      this.logger.log(`Time matched (${preferredTime}). Adding daily report job to queue.`);
-      await this.automationQueue.add('daily-report', {
-        source: 'cron',
-        timestamp: new Date(),
-      });
+      if (currentHour === prefHour) {
+        this.logger.log(`Time matched (${preferredTime}). Adding daily report job to queue.`);
+        await this.automationQueue.add('daily-report', {
+          source: 'cron',
+          timestamp: new Date(),
+        });
+      }
+    } catch (err: any) {
+      this.logger.error(`Failed to handle daily report cron: ${err.message || err}`, err.stack);
     }
   }
 

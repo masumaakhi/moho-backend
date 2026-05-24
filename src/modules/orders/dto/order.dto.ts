@@ -4,6 +4,10 @@ export class CheckoutSummaryDto {
   @IsOptional()
   @IsString()
   zone?: string;
+
+  @IsOptional()
+  @IsString()
+  coupon_code?: string;
 }
 
 export class PlaceOrderDto {
@@ -32,6 +36,10 @@ export class PlaceOrderDto {
   notes?: string;
 
   @IsOptional()
-  @IsEnum(['cod', 'online'])
+  @IsString()
   payment_method?: string;
+
+  @IsOptional()
+  @IsString()
+  coupon_code?: string;
 }

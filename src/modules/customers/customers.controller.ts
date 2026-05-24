@@ -27,7 +27,7 @@ export class CustomersController {
   }
 
   @Post('addresses')
-  addAddress(@Req() req: AuthedReq, @Body() dto: { address: string; area_city?: string; is_default?: boolean }) {
+  addAddress(@Req() req: AuthedReq, @Body() dto: { address: string; is_default?: boolean }) {
     return this.customersService.addAddress(req.user.sub, dto);
   }
 
@@ -35,7 +35,7 @@ export class CustomersController {
   updateAddress(
     @Req() req: AuthedReq,
     @Param('id') id: string,
-    @Body() dto: { address?: string; area_city?: string; is_default?: boolean }
+    @Body() dto: { address?: string; is_default?: boolean }
   ) {
     return this.customersService.updateAddress(req.user.sub, id, dto);
   }

@@ -32,6 +32,9 @@ import { TestimonialsModule } from './modules/testimonials/testimonials.module';
 import { SubscribersModule } from './modules/subscribers/subscribers.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
+import { CustomerVideoReviewsModule } from './modules/customer-video-reviews/customer-video-reviews.module';
+import { HeroCampaignsModule } from './modules/hero-campaigns/hero-campaigns.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
 
 @Module({
   imports: [
@@ -98,6 +101,9 @@ import { AnnouncementsModule } from './modules/announcements/announcements.modul
     SubscribersModule,
     UploadModule,
     AnnouncementsModule,
+    CustomerVideoReviewsModule,
+    HeroCampaignsModule,
+    CouponsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

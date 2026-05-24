@@ -3,32 +3,29 @@ import { PrismaService } from '../../database/prisma.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 
 @Injectable()
-export class AnnouncementsService {
+export class HeroCampaignsService {
   constructor(
     private prisma: PrismaService,
     private activityLogs: ActivityLogsService,
   ) {}
 
   async findAll(query: any) {
-    const { status, type, page = 1, limit = 10 } = query;
+    const { status, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (status !== undefined) {
       where.is_active = status === 'active';
     }
-    if (type !== undefined) {
-      where.type = type;
-    }
 
     const [items, total] = await Promise.all([
-      this.prisma.announcement.findMany({
+      this.prisma.heroCampaign.findMany({
         where,
         orderBy: { sort_order: 'asc' },
         skip: Number(skip),
         take: Number(limit),
       }),
-      this.prisma.announcement.count({ where }),
+      this.prisma.heroCampaign.count({ where }),
     ]);
 
     return {
@@ -37,35 +34,31 @@ export class AnnouncementsService {
     };
   }
 
-  async findPublic(type?: string) {
-    const where: any = { is_active: true };
-    if (type) {
-      where.type = type;
-    }
-    return this.prisma.announcement.findMany({
-      where,
+  async findPublic() {
+    return this.prisma.heroCampaign.findMany({
+      where: { is_active: true },
       orderBy: { sort_order: 'asc' },
     });
   }
 
   async create(adminId: string, data: any) {
-    const announcement = await this.prisma.announcement.create({ data });
+    const campaign = await this.prisma.heroCampaign.create({ data });
     
     await this.activityLogs.create({
       actor_type: 'admin',
       user_id: adminId,
-      module_name: 'announcements',
+      module_name: 'hero-campaigns',
       action: 'create',
-      entity_type: 'announcement',
-      entity_id: announcement.id,
-      description: `Created announcement: ${announcement.text.substring(0, 50)}...`,
+      entity_type: 'hero-campaign',
+      entity_id: campaign.id,
+      description: `Created hero campaign: ${campaign.text.substring(0, 50)}...`,
     });
 
-    return announcement;
+    return campaign;
   }
 
   async update(adminId: string, id: string, data: any) {
-    const announcement = await this.prisma.announcement.update({
+    const campaign = await this.prisma.heroCampaign.update({
       where: { id },
       data,
     });
@@ -73,29 +66,29 @@ export class AnnouncementsService {
     await this.activityLogs.create({
       actor_type: 'admin',
       user_id: adminId,
-      module_name: 'announcements',
+      module_name: 'hero-campaigns',
       action: 'update',
-      entity_type: 'announcement',
+      entity_type: 'hero-campaign',
       entity_id: id,
-      description: `Updated announcement: ${announcement.text.substring(0, 50)}...`,
+      description: `Updated hero campaign: ${campaign.text.substring(0, 50)}...`,
     });
 
-    return announcement;
+    return campaign;
   }
 
   async remove(adminId: string, id: string) {
-    const announcement = await this.prisma.announcement.delete({ where: { id } });
+    const campaign = await this.prisma.heroCampaign.delete({ where: { id } });
 
     await this.activityLogs.create({
       actor_type: 'admin',
       user_id: adminId,
-      module_name: 'announcements',
+      module_name: 'hero-campaigns',
       action: 'delete',
-      entity_type: 'announcement',
+      entity_type: 'hero-campaign',
       entity_id: id,
-      description: `Deleted announcement: ${announcement.text.substring(0, 50)}...`,
+      description: `Deleted hero campaign: ${campaign.text.substring(0, 50)}...`,
     });
 
-    return announcement;
+    return campaign;
   }
 }

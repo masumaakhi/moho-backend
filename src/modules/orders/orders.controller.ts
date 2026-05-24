@@ -12,7 +12,7 @@ export class OrdersController {
     @Headers('authorization') authHeader: string,
     @Body() dto: CheckoutSummaryDto
   ) {
-    return this.ordersService.checkoutSummary(sessionId, authHeader, dto.zone);
+    return this.ordersService.checkoutSummary(sessionId, authHeader, dto.zone, dto.coupon_code);
   }
 
   @Post('orders')

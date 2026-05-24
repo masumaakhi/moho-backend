@@ -97,7 +97,7 @@ export class CustomersService {
     return successResponse('Addresses fetched successfully', addresses);
   }
 
-  async addAddress(userId: string, dto: { address: string; area_city?: string; is_default?: boolean }) {
+  async addAddress(userId: string, dto: { address: string; is_default?: boolean }) {
     const customer = await this.getCustomerByUserId(userId);
 
     if (dto.is_default) {
@@ -111,7 +111,6 @@ export class CustomersService {
       data: {
         customer_id: customer.id,
         address: dto.address,
-        area_city: dto.area_city,
         is_default: dto.is_default ?? false,
       },
     });
@@ -119,7 +118,7 @@ export class CustomersService {
     return successResponse('Address added successfully', address);
   }
 
-  async updateAddress(userId: string, addressId: string, dto: { address?: string; area_city?: string; is_default?: boolean }) {
+  async updateAddress(userId: string, addressId: string, dto: { address?: string; is_default?: boolean }) {
     const customer = await this.getCustomerByUserId(userId);
     const address = await this.prisma.customerAddress.findUnique({ where: { id: addressId } });
 

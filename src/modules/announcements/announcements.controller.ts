@@ -8,8 +8,8 @@ export class AnnouncementsController {
   constructor(private readonly announcementsService: AnnouncementsService) {}
 
   @Get('public')
-  async findPublic() {
-    const data = await this.announcementsService.findPublic();
+  async findPublic(@Query('type') type?: string) {
+    const data = await this.announcementsService.findPublic(type);
     return successResponse('Announcements fetched successfully', data);
   }
 }

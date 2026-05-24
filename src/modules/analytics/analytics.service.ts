@@ -198,4 +198,293 @@ export class AnalyticsService {
     }
     return result;
   }
+
+  async getProfitVsExpenses() {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 180); // Go back 6 months for history
+    startDate.setHours(0, 0, 0, 0);
+
+    const [orders, bookings, expenses, manualEntries] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { created_at: { gte: startDate }, deleted_at: null },
+        include: {
+          order_items: {
+            include: {
+              product: { select: { cost_price: true } }
+            }
+          }
+        }
+      }),
+      this.prisma.deliveryBooking.findMany({
+        where: { created_at: { gte: startDate } }
+      }),
+      this.prisma.businessExpense.findMany({
+        where: { date: { gte: startDate } }
+      }),
+      this.prisma.manualLedgerEntry.findMany({
+        where: { date: { gte: startDate } }
+      })
+    ]);
+
+    const formatDateStr = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const dailyMap: { [dateStr: string]: { date: string; label: string; revenue: number; expenses: number; profit: number } } = {};
+
+    for (let i = 180; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = formatDateStr(d);
+      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      dailyMap[dateStr] = {
+        date: dateStr,
+        label,
+        revenue: 0,
+        expenses: 0,
+        profit: 0
+      };
+    }
+
+    orders.forEach(o => {
+      const dateStr = formatDateStr(o.created_at);
+      if (dailyMap[dateStr]) {
+        if (o.order_status === 'delivered' || o.order_status === 'shipped') {
+          dailyMap[dateStr].revenue += Number(o.total_amount || 0);
+          const prodCost = o.order_items.reduce((sum, item) => {
+            return sum + (Number(item.product.cost_price || 0) * item.quantity);
+          }, 0);
+          dailyMap[dateStr].expenses += prodCost;
+        }
+      }
+    });
+
+    bookings.forEach(b => {
+      const dateStr = formatDateStr(b.created_at);
+      if (dailyMap[dateStr]) {
+        dailyMap[dateStr].expenses += 60; // Standard booking fee
+      }
+    });
+
+    expenses.forEach(e => {
+      const dateStr = formatDateStr(e.date);
+      if (dailyMap[dateStr]) {
+        dailyMap[dateStr].expenses += Number(e.amount || 0);
+      }
+    });
+
+    manualEntries.forEach(m => {
+      const dateStr = formatDateStr(m.date);
+      if (dailyMap[dateStr]) {
+        dailyMap[dateStr].revenue += Number(m.sale_amount || 0);
+        dailyMap[dateStr].expenses += Number(m.total_expenses || 0);
+      }
+    });
+
+    Object.keys(dailyMap).forEach(key => {
+      const item = dailyMap[key];
+      item.revenue = Math.round(item.revenue * 100) / 100;
+      item.expenses = Math.round(item.expenses * 100) / 100;
+      item.profit = Math.round((item.revenue - item.expenses) * 100) / 100;
+    });
+
+    const sortedDays = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+    
+    // 1. Daily (Last 15 days)
+    const dailyData = sortedDays.slice(-15);
+
+    // 2. Weekly (Last 8 weeks)
+    const weeklyMap: { [weekLabel: string]: { label: string; revenue: number; expenses: number; profit: number; order: number } } = {};
+    sortedDays.forEach(day => {
+      const d = new Date(day.date);
+      const dayOfWeek = d.getDay();
+      const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      const weekLabel = `W/C ${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
+      if (!weeklyMap[weekLabel]) {
+        weeklyMap[weekLabel] = {
+          label: weekLabel,
+          revenue: 0,
+          expenses: 0,
+          profit: 0,
+          order: monday.getTime()
+        };
+      }
+      weeklyMap[weekLabel].revenue += day.revenue;
+      weeklyMap[weekLabel].expenses += day.expenses;
+      weeklyMap[weekLabel].profit += day.profit;
+    });
+
+    const weeklyData = Object.values(weeklyMap)
+      .sort((a, b) => a.order - b.order)
+      .slice(-8)
+      .map(({ label, revenue, expenses, profit }) => ({
+        label,
+        revenue: Math.round(revenue),
+        expenses: Math.round(expenses),
+        profit: Math.round(profit)
+      }));
+
+    // 3. Monthly (Last 6 months)
+    const monthlyMap: { [monthLabel: string]: { label: string; revenue: number; expenses: number; profit: number; order: number } } = {};
+    sortedDays.forEach(day => {
+      const d = new Date(day.date);
+      const monthLabel = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      const orderKey = d.getFullYear() * 12 + d.getMonth();
+
+      if (!monthlyMap[monthLabel]) {
+        monthlyMap[monthLabel] = {
+          label: monthLabel,
+          revenue: 0,
+          expenses: 0,
+          profit: 0,
+          order: orderKey
+        };
+      }
+      monthlyMap[monthLabel].revenue += day.revenue;
+      monthlyMap[monthLabel].expenses += day.expenses;
+      monthlyMap[monthLabel].profit += day.profit;
+    });
+
+    const monthlyData = Object.values(monthlyMap)
+      .sort((a, b) => a.order - b.order)
+      .slice(-6)
+      .map(({ label, revenue, expenses, profit }) => ({
+        label,
+        revenue: Math.round(revenue),
+        expenses: Math.round(expenses),
+        profit: Math.round(profit)
+      }));
+
+    return {
+      success: true,
+      data: {
+        daily: dailyData,
+        weekly: weeklyData,
+        monthly: monthlyData
+      }
+    };
+  }
+
+  async getSalesRevenueOrders() {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 180);
+    startDate.setHours(0, 0, 0, 0);
+
+    const orders = await this.prisma.order.findMany({
+      where: { created_at: { gte: startDate }, deleted_at: null },
+      select: { created_at: true, total_amount: true, order_status: true }
+    });
+
+    const formatDateStr = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const dailyMap: { [dateStr: string]: { date: string; label: string; orders: number; revenue: number } } = {};
+
+    for (let i = 180; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = formatDateStr(d);
+      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      dailyMap[dateStr] = {
+        date: dateStr,
+        label,
+        orders: 0,
+        revenue: 0
+      };
+    }
+
+    orders.forEach(o => {
+      const dateStr = formatDateStr(o.created_at);
+      if (dailyMap[dateStr]) {
+        dailyMap[dateStr].orders += 1;
+        if (o.order_status !== 'cancelled') {
+          dailyMap[dateStr].revenue += Number(o.total_amount || 0);
+        }
+      }
+    });
+
+    Object.keys(dailyMap).forEach(key => {
+      const item = dailyMap[key];
+      item.revenue = Math.round(item.revenue * 100) / 100;
+    });
+
+    const sortedDays = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+
+    const dailyData = sortedDays.slice(-15);
+
+    const weeklyMap: { [weekLabel: string]: { label: string; orders: number; revenue: number; order: number } } = {};
+    sortedDays.forEach(day => {
+      const d = new Date(day.date);
+      const dayOfWeek = d.getDay();
+      const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      const weekLabel = `W/C ${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
+      if (!weeklyMap[weekLabel]) {
+        weeklyMap[weekLabel] = {
+          label: weekLabel,
+          orders: 0,
+          revenue: 0,
+          order: monday.getTime()
+        };
+      }
+      weeklyMap[weekLabel].orders += day.orders;
+      weeklyMap[weekLabel].revenue += day.revenue;
+    });
+
+    const weeklyData = Object.values(weeklyMap)
+      .sort((a, b) => a.order - b.order)
+      .slice(-8)
+      .map(({ label, orders, revenue }) => ({
+        label,
+        orders,
+        revenue: Math.round(revenue)
+      }));
+
+    const monthlyMap: { [monthLabel: string]: { label: string; orders: number; revenue: number; order: number } } = {};
+    sortedDays.forEach(day => {
+      const d = new Date(day.date);
+      const monthLabel = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      const orderKey = d.getFullYear() * 12 + d.getMonth();
+
+      if (!monthlyMap[monthLabel]) {
+        monthlyMap[monthLabel] = {
+          label: monthLabel,
+          orders: 0,
+          revenue: 0,
+          order: orderKey
+        };
+      }
+      monthlyMap[monthLabel].orders += day.orders;
+      monthlyMap[monthLabel].revenue += day.revenue;
+    });
+
+    const monthlyData = Object.values(monthlyMap)
+      .sort((a, b) => a.order - b.order)
+      .slice(-6)
+      .map(({ label, orders, revenue }) => ({
+        label,
+        orders,
+        revenue: Math.round(revenue)
+      }));
+
+    return {
+      success: true,
+      data: {
+        daily: dailyData,
+        weekly: weeklyData,
+        monthly: monthlyData
+      }
+    };
+  }
 }
+

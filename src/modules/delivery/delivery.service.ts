@@ -219,7 +219,11 @@ export class DeliveryService {
     if (randomStatus === 'delivered') {
       await this.prisma.order.update({
         where: { id: booking.order_id },
-        data: { order_status: 'delivered' }
+        data: { 
+          order_status: 'delivered',
+          payment_status: 'paid',
+          delivered_at: new Date()
+        }
       });
       // Log history
       await this.prisma.orderStatusHistory.create({
@@ -274,10 +278,14 @@ export class DeliveryService {
     });
 
     // Logic for order status updates based on status (similar to syncTracking)
-    if (status === 'Delivered') {
+    if (status === 'Delivered' || status === 'delivered') {
         await this.prisma.order.update({
             where: { id: booking.order_id },
-            data: { order_status: 'delivered' }
+            data: { 
+              order_status: 'delivered',
+              payment_status: 'paid',
+              delivered_at: new Date()
+            }
         });
     }
 

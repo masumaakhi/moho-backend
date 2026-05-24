@@ -30,7 +30,41 @@ export class OrdersService {
     }
   }
 
-  async checkoutSummary(sessionId: string, authHeader: string, zone?: string) {
+  private async validateCoupon(code: string, subtotal: number) {
+    const coupon = await this.prisma.coupon.findUnique({
+      where: { code: code.toUpperCase() }
+    });
+
+    if (!coupon) {
+      throw new BadRequestException('Invalid coupon code');
+    }
+    if (!coupon.is_active) {
+      throw new BadRequestException('Coupon is inactive');
+    }
+    if (coupon.expiry_date && new Date() > new Date(coupon.expiry_date)) {
+      throw new BadRequestException('Coupon has expired');
+    }
+    if (coupon.usage_limit && coupon.used_count >= coupon.usage_limit) {
+      throw new BadRequestException('Coupon usage limit reached');
+    }
+    if (subtotal < Number(coupon.min_order_amount)) {
+      throw new BadRequestException(`Minimum order amount of ৳${coupon.min_order_amount} not met for this coupon`);
+    }
+
+    let discount = 0;
+    if (coupon.discount_type === 'percentage') {
+      discount = subtotal * (Number(coupon.discount_value) / 100);
+      if (coupon.max_discount_amount) {
+        discount = Math.min(discount, Number(coupon.max_discount_amount));
+      }
+    } else if (coupon.discount_type === 'flat') {
+      discount = Number(coupon.discount_value);
+    }
+
+    return Math.min(discount, subtotal);
+  }
+
+  async checkoutSummary(sessionId: string, authHeader: string, zone?: string, couponCode?: string) {
     const userId = this.extractUserId(authHeader);
     
     if (!userId && !sessionId) throw new BadRequestException('Cart is empty');
@@ -56,16 +90,21 @@ export class OrdersService {
     
     // Calculate delivery charge
     let delivery_charge = 0;
-    if (zone === 'inside_dhaka') delivery_charge = 60;
+    if (zone === 'inside_dhaka') delivery_charge = 80;
     else if (zone === 'outside_dhaka') delivery_charge = 120;
-    else delivery_charge = 60; // Default or maybe 0 if not selected
+    else delivery_charge = 80; // Default
 
-    const total_amount = subtotal + delivery_charge;
+    let discount = 0;
+    if (couponCode) {
+      discount = await this.validateCoupon(couponCode, subtotal);
+    }
+
+    const total_amount = subtotal + delivery_charge - discount;
 
     return {
       subtotal,
       delivery_charge,
-      discount: 0,
+      discount,
       total_amount
     };
   }
@@ -105,7 +144,7 @@ export class OrdersService {
       }
     }
 
-    const summary = await this.checkoutSummary(sessionId, authHeader, dto.zone);
+    const summary = await this.checkoutSummary(sessionId, authHeader, dto.zone, dto.coupon_code);
     
     let finalUserId: string | null = userId;
     let customerId: string | null = null;
@@ -199,6 +238,8 @@ export class OrdersService {
         payment_method: dto.payment_method || 'cod',
         subtotal: summary.subtotal,
         delivery_charge: summary.delivery_charge,
+        discount_amount: summary.discount,
+        coupon_code: dto.coupon_code ? dto.coupon_code.toUpperCase() : null,
         total_amount: summary.total_amount,
         is_guest_order: !userId,
         auto_account_created: autoAccountCreated,
@@ -242,6 +283,14 @@ export class OrdersService {
           data: { stock_quantity: { decrement: item.quantity } }
         });
       }
+    }
+
+    // Increment coupon usage globally
+    if (dto.coupon_code) {
+      await this.prisma.coupon.update({
+        where: { code: dto.coupon_code.toUpperCase() },
+        data: { used_count: { increment: 1 } }
+      });
     }
 
     // Comprehensive Fraud & Duplicate Check
@@ -308,15 +357,23 @@ export class OrdersService {
     });
     if (!order) throw new NotFoundException('Order not found');
     
+    const orderCount = await this.prisma.order.count({
+      where: { customer_phone: order.customer_phone }
+    });
+    
     return {
       order_number: order.order_number,
       customer_name: order.customer_name,
       items: order.order_items,
+      subtotal: order.subtotal,
+      discount_amount: order.discount_amount,
+      coupon_code: order.coupon_code,
       total_amount: order.total_amount,
       delivery_charge: order.delivery_charge,
       shipping_address: order.shipping_address,
       auto_account_created: order.auto_account_created,
-      account_created_user_id: order.account_created_user_id
+      account_created_user_id: order.account_created_user_id,
+      order_count: orderCount
     };
   }
 
@@ -460,7 +517,10 @@ export class OrdersService {
         where: { id },
         data: { 
           order_status: status,
-          ...(status === 'delivered' ? { delivered_at: new Date() } : {})
+          ...(status === 'delivered' ? { 
+            delivered_at: new Date(),
+            payment_status: 'paid'
+          } : {})
         }
       });
 

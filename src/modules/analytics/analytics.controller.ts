@@ -31,4 +31,15 @@ export class AnalyticsController {
   getAlerts() {
     return this.analyticsService.getAlerts();
   }
+
+  @Get('analytics/profit-vs-expenses')
+  getProfitVsExpenses() {
+    return this.analyticsService.getProfitVsExpenses();
+  }
+
+  @Get('analytics/sales-revenue-orders')
+  getSalesRevenueOrders() {
+    return this.analyticsService.getSalesRevenueOrders();
+  }
 }
+

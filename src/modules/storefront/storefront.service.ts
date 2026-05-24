@@ -4,66 +4,72 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class StorefrontService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getHome() {
     const heroSections = await this.prisma.homepageSection.findMany({
       where: { is_active: true },
       orderBy: { sort_order: 'asc' },
     });
-    
+
     const trendingProducts = await this.prisma.product.findMany({
       where: { status: 'active', is_trending: true, deleted_at: null },
       take: 8,
       include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
     });
-    
+
     const featuredProducts = await this.prisma.product.findMany({
       where: { status: 'active', is_featured: true, deleted_at: null },
       take: 8,
       include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
     });
-    
+
     const reviews = await this.prisma.productReview.findMany({
       where: { status: 'approved' },
       take: 5,
       include: { product: true, customer: true }
     });
-    
+
+    const videoReviews = await this.prisma.customerVideoReview.findMany({
+      where: { is_active: true },
+      orderBy: { sort_order: 'asc' }
+    });
+
     return {
       heroSections,
       trendingProducts,
       featuredProducts,
       reviews,
+      videoReviews,
     };
   }
 
   async getProducts(query: any) {
     const { search, category, minPrice, maxPrice, sort, page = 1, limit = 12 } = query;
     const where: Prisma.ProductWhereInput = { status: 'active', deleted_at: null };
-    
+
     if (search) {
       where.name = { contains: search, mode: 'insensitive' };
     }
-    
+
     if (category) {
       where.category = { slug: category };
     }
-    
+
     if (minPrice) {
       where.new_price = { ...((where.new_price as any) || {}), gte: parseFloat(minPrice) };
     }
-    
+
     if (maxPrice) {
       where.new_price = { ...((where.new_price as any) || {}), lte: parseFloat(maxPrice) };
     }
-    
+
     let orderBy: Prisma.ProductOrderByWithRelationInput = { created_at: 'desc' };
     if (sort === 'price_asc') orderBy = { new_price: 'asc' };
     else if (sort === 'price_desc') orderBy = { new_price: 'desc' };
-    
+
     const skip = (Number(page) - 1) * Number(limit);
-    
+
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
@@ -74,7 +80,7 @@ export class StorefrontService {
       }),
       this.prisma.product.count({ where })
     ]);
-    
+
     return {
       data: products,
       meta: {
@@ -99,11 +105,11 @@ export class StorefrontService {
         }
       }
     });
-    
+
     if (!product) {
       throw new NotFoundException('Product not found');
     }
-    
+
     return product;
   }
 
@@ -126,7 +132,7 @@ export class StorefrontService {
   async getRelatedProducts(id: string) {
     const product = await this.prisma.product.findUnique({ where: { id } });
     if (!product) throw new NotFoundException();
-    
+
     return this.prisma.product.findMany({
       where: {
         status: 'active',

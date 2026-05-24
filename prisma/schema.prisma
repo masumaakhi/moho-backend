@@ -65,7 +65,6 @@ model CustomerAddress {
   id          String   @id @default(uuid()) @db.Uuid
   customer_id String   @db.Uuid
   address     String
-  area_city   String?
   is_default  Boolean  @default(false)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
@@ -189,6 +188,7 @@ model Order {
   discount_amount         Decimal?              @db.Decimal(12, 2)
   delivery_charge         Decimal?              @db.Decimal(12, 2)
   total_amount            Decimal?              @db.Decimal(12, 2)
+  coupon_code             String?
   is_guest_order          Boolean               @default(false)
   auto_account_created    Boolean               @default(false)
   account_created_user_id String?               @db.Uuid
@@ -287,6 +287,44 @@ model DailyReport {
   updated_at     DateTime @updatedAt
 
   @@map("daily_reports")
+}
+
+model ManualLedgerEntry {
+  id                String   @id @default(uuid()) @db.Uuid
+  date              DateTime @unique
+  sale_amount       Decimal  @db.Decimal(12, 2)
+  ad_dollar         Decimal  @db.Decimal(12, 2)
+  ad_rate           Decimal  @default(135) @db.Decimal(12, 2)
+  parcels_count     Int      @default(0)
+  returns_count     Int      @default(0)
+  
+  // Product Quantities
+  c100_qty          Int      @default(0)
+  c200_qty          Int      @default(0)
+  c400_qty          Int      @default(0)
+  o100_qty          Int      @default(0)
+  o200_qty          Int      @default(0)
+  o400_qty          Int      @default(0)
+  s100_qty          Int      @default(0)
+  s200_qty          Int      @default(0)
+  p50_qty           Int      @default(0)
+  p100_qty          Int      @default(0)
+  p200_qty          Int      @default(0)
+  
+  // Custom Ad-hoc Item
+  custom_item_name  String?
+  custom_item_qty   Int      @default(0)
+  custom_item_cost  Decimal  @default(0) @db.Decimal(12, 2)
+  
+  // Calculated Totals
+  total_prod_cost   Decimal  @db.Decimal(12, 2)
+  total_expenses    Decimal  @db.Decimal(12, 2)
+  net_profit        Decimal  @db.Decimal(12, 2)
+  
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("manual_ledger_entries")
 }
 
 model ReportExport {
@@ -671,16 +709,61 @@ model Testimonial {
   @@map("testimonials")
 }
 
+model CustomerVideoReview {
+  id         String   @id @default(uuid()) @db.Uuid
+  title      String?
+  video_url  String
+  is_active  Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("customer_video_reviews")
+}
+
 model Announcement {
   id         String   @id @default(uuid()) @db.Uuid
   text       String
   link_url   String?
+  type       String   @default("topbar")
   is_active  Boolean  @default(true)
   sort_order Int      @default(0)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   @@map("announcements")
+}
+
+model HeroCampaign {
+  id          String   @id @default(uuid()) @db.Uuid
+  badge       String   @default("SPECIAL OFFER / ANNOUNCEMENT")
+  text        String
+  button_text String   @default("CLAIM OFFER")
+  link_url    String?
+  style_type  String   @default("red_glass") // e.g. red_glass, gold_glass, emerald_glass, indigo_glass, rose_pink_glass
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("hero_campaigns")
+}
+
+model Coupon {
+  id                  String    @id @default(uuid()) @db.Uuid
+  code                String    @unique // e.g. "MOHUL20", stored uppercase
+  discount_type       String    @default("percentage") // "percentage" or "flat"
+  discount_value      Decimal   @db.Decimal(12, 2)
+  min_order_amount    Decimal   @default(0) @db.Decimal(12, 2)
+  max_discount_amount Decimal?  @db.Decimal(12, 2)
+  expiry_date         DateTime?
+  usage_limit         Int?
+  used_count          Int       @default(0)
+  is_active           Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@map("coupons")
 }
 
 enum UserStatus {
