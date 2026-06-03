@@ -108,6 +108,10 @@ export class CreateProductDto {
   @IsOptional()
   is_trending?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  is_free_delivery?: boolean;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProductImageDto)

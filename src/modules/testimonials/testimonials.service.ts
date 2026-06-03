@@ -55,6 +55,27 @@ export class TestimonialsService {
     return testimonial;
   }
 
+  async createPublic(data: any) {
+    const testimonial = await this.prisma.testimonial.create({ 
+      data: {
+        name: data.name,
+        rating: data.rating,
+        text: data.text,
+        is_active: false, // Force hidden until admin approves
+      } 
+    });
+    
+    await this.activityLogs.create({
+      actor_type: 'customer',
+      action: 'submit_review',
+      entity_type: 'testimonial',
+      entity_id: testimonial.id,
+      description: `Customer ${testimonial.name} submitted a new review`,
+    });
+
+    return testimonial;
+  }
+
   async update(adminId: string, id: string, data: any) {
     const testimonial = await this.prisma.testimonial.update({
       where: { id },

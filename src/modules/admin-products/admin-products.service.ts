@@ -98,6 +98,7 @@ export class AdminProductsService {
         status: dto.status || 'active',
         is_featured: dto.is_featured || false,
         is_trending: dto.is_trending || false,
+        is_free_delivery: dto.is_free_delivery || false,
         images: {
           create: dto.images?.map((img, index) => ({
             image_url: img.image_url,
@@ -164,6 +165,7 @@ export class AdminProductsService {
         status: dto.status,
         is_featured: dto.is_featured,
         is_trending: dto.is_trending,
+        is_free_delivery: dto.is_free_delivery,
       }
     });
 

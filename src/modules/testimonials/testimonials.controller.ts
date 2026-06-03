@@ -27,6 +27,12 @@ export class TestimonialsController {
     return successResponse('Testimonial created successfully', data);
   }
 
+  @Post('public')
+  async createPublic(@Body() body: any) {
+    const data = await this.testimonialsService.createPublic(body);
+    return successResponse('Review submitted successfully', data);
+  }
+
   @Patch(':id')
   @UseGuards(AdminAuthGuard)
   async update(@Param('id') id: string, @Req() req: any, @Body() body: any) {

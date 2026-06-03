@@ -78,7 +78,9 @@ export class OrdersService {
         ]
       },
       include: {
-        items: true
+        items: {
+          include: { product: true }
+        }
       }
     });
 
@@ -90,9 +92,12 @@ export class OrdersService {
     
     // Calculate delivery charge
     let delivery_charge = 0;
-    if (zone === 'inside_dhaka') delivery_charge = 80;
-    else if (zone === 'outside_dhaka') delivery_charge = 120;
-    else delivery_charge = 80; // Default
+    const hasFreeDeliveryProduct = cart.items.some(item => (item as any).product?.is_free_delivery);
+    if (!hasFreeDeliveryProduct) {
+      if (zone === 'inside_dhaka') delivery_charge = 80;
+      else if (zone === 'outside_dhaka') delivery_charge = 120;
+      else delivery_charge = 80; // Default
+    }
 
     let discount = 0;
     if (couponCode) {

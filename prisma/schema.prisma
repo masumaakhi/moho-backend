@@ -250,6 +250,7 @@ model Product {
   deleted_at        DateTime?
   how_to_use        String?
   cost_price        Decimal          @default(0) @db.Decimal(12, 2)
+  is_free_delivery  Boolean          @default(false)
   cart_items        CartItem[]
   order_items       OrderItem[]
   faqs              ProductFAQ[]
