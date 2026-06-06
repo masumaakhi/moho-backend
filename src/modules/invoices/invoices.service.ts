@@ -244,4 +244,137 @@ export class InvoicesService {
       }
     }
   }
+
+  async exportBulkPdf(orderIds: string[], res: Response, adminId?: string) {
+    try {
+      const invoices: any[] = [];
+      for (const orderId of orderIds) {
+        let invoice = await this.prisma.invoice.findFirst({
+          where: { order_id: orderId, deleted_at: null },
+          include: {
+            order: {
+              include: {
+                order_items: { include: { product: true } },
+                user: true,
+                customer: true,
+              }
+            }
+          }
+        });
+
+        if (!invoice) {
+          const genResult = await this.generate(orderId, adminId);
+          if (genResult.success) {
+            invoice = await this.prisma.invoice.findUnique({
+              where: { id: genResult.data.id },
+              include: {
+                order: {
+                  include: {
+                    order_items: { include: { product: true } },
+                    user: true,
+                    customer: true,
+                  }
+                }
+              }
+            });
+          }
+        }
+
+        if (invoice) {
+          invoices.push(invoice);
+        }
+      }
+
+      if (invoices.length === 0) {
+        throw new NotFoundException('No invoices found or generated for selected orders');
+      }
+
+      const PDFDoc = require('pdfkit');
+      const doc = new PDFDoc({ margin: 50 });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=bulk-invoices.pdf`);
+
+      doc.pipe(res);
+
+      invoices.forEach((invoice, index) => {
+        if (index > 0) {
+          doc.addPage();
+        }
+
+        // Header
+        doc.fontSize(20).text('MOHUL ORGANIC', { align: 'left' });
+        doc.fontSize(10).text('Premium Organic Products', { align: 'left' });
+        doc.moveDown();
+
+        doc.fontSize(12).text(`Invoice Number: ${invoice.invoice_number}`, { align: 'right' });
+        doc.text(`Date: ${invoice.invoice_date.toLocaleDateString()}`, { align: 'right' });
+        doc.text(`Order ID: ${invoice.order_id}`, { align: 'right' });
+        doc.moveDown();
+
+        // Customer Info
+        const customer = invoice.order.customer || invoice.order.user;
+        doc.fontSize(14).text('Bill To:', { underline: true });
+        doc.fontSize(10).text(`Name: ${customer?.name || 'N/A'}`);
+        doc.text(`Phone: ${customer?.phone || 'N/A'}`);
+        doc.text(`Email: ${customer?.email || 'N/A'}`);
+        doc.text(`Address: ${invoice.order.shipping_address || 'N/A'}`);
+        doc.moveDown();
+
+        // Items Table
+        doc.fontSize(12).text('Order Summary', { underline: true });
+        doc.moveDown(0.5);
+
+        const tableTop = doc.y;
+        doc.fontSize(10).text('Product', 50, tableTop);
+        doc.text('Qty', 300, tableTop);
+        doc.text('Price', 350, tableTop);
+        doc.text('Total', 450, tableTop);
+        
+        doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+        
+        let currentY = tableTop + 25;
+        invoice.order.order_items.forEach(item => {
+          doc.text(item.product?.name || item.product_name, 50, currentY);
+          doc.text(item.quantity.toString(), 300, currentY);
+          doc.text(`Tk ${item.unit_price}`, 350, currentY);
+          doc.text(`Tk ${Number(item.unit_price) * item.quantity}`, 450, currentY);
+          currentY += 20;
+        });
+
+        doc.moveTo(50, currentY).lineTo(550, currentY).stroke();
+        currentY += 10;
+
+        // Totals
+        doc.text('Subtotal:', 350, currentY);
+        doc.text(`Tk ${invoice.subtotal}`, 450, currentY);
+        currentY += 15;
+        doc.text('Delivery Charge:', 350, currentY);
+        doc.text(`Tk ${invoice.delivery_charge}`, 450, currentY);
+        currentY += 15;
+        doc.text('Discount:', 350, currentY);
+        doc.text(`-Tk ${invoice.discount}`, 450, currentY);
+        currentY += 15;
+        doc.fontSize(12).font('Helvetica-Bold').text('Total Amount:', 350, currentY);
+        doc.text(`Tk ${invoice.total_amount}`, 450, currentY);
+
+        doc.moveDown(4);
+        doc.fontSize(10).font('Helvetica').text('Thank you for shopping with Mohul Organic!', { align: 'center' });
+      });
+
+      doc.end();
+
+      await this.activityLog.create({
+        user_id: adminId,
+        action: 'DOWNLOAD_BULK_INVOICES_PDF',
+        entity_type: 'invoice',
+        details: { count: invoices.length, orderIds },
+      });
+    } catch (error) {
+      console.error('Bulk PDF Generation Error:', error);
+      if (!res.headersSent) {
+        res.status(500).send('Failed to generate bulk PDF');
+      }
+    }
+  }
 }

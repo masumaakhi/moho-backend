@@ -31,6 +31,18 @@ export class UpdateDeliverySettingsDto {
   @IsOptional()
   pathao_client_id?: string;
 
+  @IsString()
+  @IsOptional()
+  pathao_store_id?: string;
+
+  @IsString()
+  @IsOptional()
+  pathao_username?: string;
+
+  @IsString()
+  @IsOptional()
+  pathao_password?: string;
+
   @IsNumber()
   @IsOptional()
   delivery_charge_default?: number;

@@ -39,7 +39,7 @@ export class SettingsService {
       let value = s.value;
       
       // Mask sensitive values
-      if (['pathao_api_key', 'pathao_secret', 'smtp_pass'].includes(s.key)) {
+      if (['pathao_api_key', 'pathao_secret', 'pathao_password', 'smtp_pass'].includes(s.key)) {
         value = maskValue(decrypt(value, this.encryptionKey));
       }
 
@@ -67,7 +67,7 @@ export class SettingsService {
     }
 
     const updates: any[] = [];
-    const sensitiveKeys = ['pathao_api_key', 'pathao_secret', 'smtp_pass'];
+    const sensitiveKeys = ['pathao_api_key', 'pathao_secret', 'pathao_password', 'smtp_pass'];
 
     for (const [key, value] of Object.entries(data)) {
       if (value === undefined || value === null) continue;

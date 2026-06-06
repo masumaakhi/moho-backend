@@ -34,6 +34,20 @@ export class AdminOrdersController {
     return successResponse('Order details fetched successfully', data);
   }
 
+  @Patch('bulk-status')
+  async bulkUpdateStatus(@Req() req: AuthedReq, @Body() dto: { ids: string[]; status: string; reason?: string }) {
+    const results: any[] = [];
+    for (const id of dto.ids) {
+      try {
+        const data = await this.ordersService.updateOrderStatus(req.user.sub, id, dto.status, dto.reason);
+        results.push({ id, success: true, data });
+      } catch (err: any) {
+        results.push({ id, success: false, error: err.message || 'Failed to update status' });
+      }
+    }
+    return successResponse('Bulk status update completed', results);
+  }
+
   @Patch(':id')
   async updateOrder(@Req() req: AuthedReq, @Param('id') id: string, @Body() dto: any) {
     const data = await this.ordersService.updateOrder(req.user.sub, id, dto);

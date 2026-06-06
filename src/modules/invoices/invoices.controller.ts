@@ -19,6 +19,13 @@ export class InvoicesController {
     return this.invoicesService.generate(orderId, adminId);
   }
 
+  @Get('bulk-pdf')
+  async exportBulkPdf(@Query('orderIds') orderIdsString: string, @Res() res: Response, @Req() req: any) {
+    const adminId = req.user.sub;
+    const orderIds = orderIdsString ? orderIdsString.split(',') : [];
+    return this.invoicesService.exportBulkPdf(orderIds, res, adminId);
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.invoicesService.findOne(id);

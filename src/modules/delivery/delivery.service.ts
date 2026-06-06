@@ -1,13 +1,18 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { successResponse } from '../../common/responses/api-response';
+import { ConfigService } from '@nestjs/config';
+import { decrypt } from '../../common/utils/crypto.util';
 import axios from 'axios';
 
 @Injectable()
 export class DeliveryService {
   private readonly pathaoBaseUrl = 'https://api-hermes.pathao.com'; // Example URL
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService
+  ) {}
 
   async getDeliveries(query: any) {
     const { status, search, page = 1, limit = 10 } = query;
@@ -99,68 +104,154 @@ export class DeliveryService {
       const settings = await this.prisma.setting.findMany({
         where: { group: 'delivery' }
       });
-      const apiKey = settings.find(s => s.key === 'pathao_api_key')?.value || process.env.PATHAO_API_KEY;
-      const secret = settings.find(s => s.key === 'pathao_api_secret')?.value || process.env.PATHAO_API_SECRET;
+      
+      const encryptionKey = this.configService.get<string>('SETTINGS_ENCRYPTION_KEY') || 'default_secret_key';
+
+      let apiKey = settings.find(s => s.key === 'pathao_api_key')?.value;
+      if (apiKey) {
+        apiKey = decrypt(apiKey, encryptionKey);
+      } else {
+        apiKey = process.env.PATHAO_API_KEY;
+      }
+
+      let secret = settings.find(s => s.key === 'pathao_secret')?.value;
+      if (secret) {
+        secret = decrypt(secret, encryptionKey);
+      } else {
+        secret = process.env.PATHAO_API_SECRET;
+      }
+
       const storeId = settings.find(s => s.key === 'pathao_store_id')?.value;
+      const username = settings.find(s => s.key === 'pathao_username')?.value || process.env.PATHAO_USERNAME;
+      
+      let password = settings.find(s => s.key === 'pathao_password')?.value;
+      if (password) {
+        password = decrypt(password, encryptionKey);
+      } else {
+        password = process.env.PATHAO_PASSWORD;
+      }
 
-      if (!apiKey) throw new Error('Pathao API Key not configured');
+      if (!apiKey || !secret) {
+        throw new Error('Pathao API Credentials not fully configured');
+      }
 
-      // 2. Call Pathao API (Mocked for now)
-      // In real implementation, you'd handle OAuth and then POST /aladdin/api/v1/orders
-      const mockResponse = {
-        success: true,
-        data: {
-          consignment_id: 'PH-' + Math.random().toString(36).substring(7).toUpperCase(),
-          tracking_id: 'TRK-' + Math.random().toString(36).substring(7).toUpperCase(),
-        }
+      if (!storeId) {
+        throw new Error('Pathao Store ID not configured');
+      }
+
+      // 2. Fetch OAuth token from Pathao
+      const grantType = (username && password) ? 'password' : 'client_credentials';
+
+      const tokenPayload: any = {
+        client_id: apiKey,
+        client_secret: secret,
+        grant_type: grantType
       };
 
-      // 3. Update Booking
+      if (grantType === 'password') {
+        tokenPayload.username = username;
+        tokenPayload.password = password;
+      }
+
+      const tokenRes = await axios.post('https://api-hermes.pathao.com/aladdin/api/v1/issue-token', tokenPayload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      const token = tokenRes.data.access_token;
+      if (!token) throw new Error('Failed to retrieve access token from Pathao');
+
+      // 3. Calculate Cash on Delivery (COD) amount to collect
+      const amountToCollect = (order.payment_method?.toLowerCase() === 'cod' && order.payment_status !== 'paid') 
+        ? Number(order.total_amount) 
+        : 0;
+
+      // 4. Create Order Booking in Pathao
+      const bookingPayload = {
+        store_id: Number(storeId),
+        merchant_order_id: order.order_number,
+        recipient_name: order.customer_name,
+        recipient_phone: order.customer_phone,
+        recipient_address: order.shipping_address,
+        delivery_type: 48, // 48: Normal, 12: On Demand
+        item_type: 2, // 2: Parcel
+        special_instruction: "Handle with care. Call before delivery.",
+        item_quantity: 1,
+        item_weight: "0.5",
+        item_description: "Organic products",
+        amount_to_collect: amountToCollect
+      };
+
+      const bookRes = await axios.post('https://api-hermes.pathao.com/aladdin/api/v1/orders', bookingPayload, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      const responseData = bookRes.data;
+      if (!responseData || responseData.code !== 200 || !responseData.data) {
+        throw new Error(responseData?.message || 'Pathao API returned an error response');
+      }
+
+      const pathaoOrder = responseData.data;
+
+      // 5. Update Booking
       await this.prisma.deliveryBooking.update({
         where: { id: booking.id },
         data: {
-          consignment_id: mockResponse.data.consignment_id,
-          tracking_id: mockResponse.data.tracking_id,
+          consignment_id: pathaoOrder.consignment_id,
+          tracking_id: pathaoOrder.tracking_id || pathaoOrder.consignment_id,
           delivery_status: 'booked',
-          booking_response: mockResponse as any
+          booking_response: responseData as any
         }
       });
 
-      // 4. Update Order Status
+      // 6. Update Order Status
       await this.prisma.order.update({
         where: { id: orderId },
-        data: { order_status: 'processing' } // Or 'shipped' if immediately picked
+        data: { order_status: 'processing' }
       });
 
-      // 5. Activity Log
+      // 7. Activity Log
       await this.prisma.activityLog.create({
         data: {
           user_id: adminId,
           action: 'courier_booked',
           entity_type: 'order',
           entity_id: orderId,
-          details: { courier: 'pathao', tracking_id: mockResponse.data.tracking_id }
+          details: { courier: 'pathao', tracking_id: pathaoOrder.tracking_id || pathaoOrder.consignment_id }
         }
       });
 
-      // 6. Notification
+      // 8. Notification
       await this.prisma.notification.create({
         data: {
           user_id: order.user_id,
           type: 'delivery_update',
           title: 'Order Handed to Courier',
-          message: `Your order ${order.order_number} has been handed over to Pathao. Tracking ID: ${mockResponse.data.tracking_id}`
+          message: `Your order ${order.order_number} has been handed over to Pathao. Tracking ID: ${pathaoOrder.tracking_id || pathaoOrder.consignment_id}`
         }
       });
 
-      return { success: true, tracking_id: mockResponse.data.tracking_id };
+      return { success: true, tracking_id: pathaoOrder.tracking_id || pathaoOrder.consignment_id };
 
-    } catch (error) {
+    } catch (error: any) {
+      let errorMsg = error.message;
+      if (error.response?.data) {
+        errorMsg = typeof error.response.data === 'string'
+          ? error.response.data
+          : (error.response.data.message || JSON.stringify(error.response.data.errors || error.response.data));
+      }
+
       // Log retry
       await this.prisma.deliveryRetryLog.create({
         data: {
           booking_id: booking.id,
-          error_message: error.message,
+          error_message: errorMsg,
           retry_number: booking.retry_count + 1
         }
       });
@@ -174,7 +265,7 @@ export class DeliveryService {
         }
       });
 
-      throw new BadRequestException(`Courier booking failed: ${error.message}`);
+      throw new BadRequestException(`Courier booking failed: ${errorMsg}`);
     }
   }
 
