@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { successResponse } from '../../common/responses/api-response';
 import { ConfigService } from '@nestjs/config';
@@ -11,7 +15,7 @@ export class DeliveryService {
 
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService
+    private configService: ConfigService,
   ) {}
 
   async getDeliveries(query: any) {
@@ -24,7 +28,7 @@ export class DeliveryService {
       where.OR = [
         { consignment_id: { contains: search, mode: 'insensitive' } },
         { tracking_id: { contains: search, mode: 'insensitive' } },
-        { order: { order_number: { contains: search, mode: 'insensitive' } } }
+        { order: { order_number: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -34,9 +38,9 @@ export class DeliveryService {
         skip,
         take: Number(limit),
         include: { order: true },
-        orderBy: { created_at: 'desc' }
+        orderBy: { created_at: 'desc' },
       }),
-      this.prisma.deliveryBooking.count({ where })
+      this.prisma.deliveryBooking.count({ where }),
     ]);
 
     return {
@@ -44,25 +48,25 @@ export class DeliveryService {
       meta: {
         total,
         page: Number(page),
-        last_page: Math.ceil(total / Number(limit))
-      }
+        last_page: Math.ceil(total / Number(limit)),
+      },
     };
   }
 
   async getDeliveryDetails(id: string) {
     const delivery = await this.prisma.deliveryBooking.findUnique({
       where: { id },
-      include: { 
+      include: {
         order: {
-          include: { order_items: true }
+          include: { order_items: true },
         },
         tracking_events: {
-          orderBy: { event_time: 'desc' }
+          orderBy: { event_time: 'desc' },
         },
         retry_logs: {
-          orderBy: { created_at: 'desc' }
-        }
-      }
+          orderBy: { created_at: 'desc' },
+        },
+      },
     });
     if (!delivery) throw new NotFoundException('Delivery not found');
     return delivery;
@@ -71,21 +75,36 @@ export class DeliveryService {
   async bookCourier(adminId: string, orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { delivery_bookings: true }
+      include: { delivery_bookings: true },
     });
 
     if (!order) throw new NotFoundException('Order not found');
-    if (order.order_status !== 'confirmed' && order.order_status !== 'processing') {
-      throw new BadRequestException('Only confirmed or processing orders can be booked');
+    if (
+      order.order_status !== 'confirmed' &&
+      order.order_status !== 'processing'
+    ) {
+      throw new BadRequestException(
+        'Only confirmed or processing orders can be booked',
+      );
     }
 
     // Check if already booked successfully
-    const existingSuccess = order.delivery_bookings.find(b => b.delivery_status === 'booked' || b.delivery_status === 'in_transit');
-    if (existingSuccess) throw new BadRequestException('Order already booked with courier');
+    const existingSuccess = order.delivery_bookings.find(
+      (b) =>
+        b.delivery_status === 'booked' || b.delivery_status === 'in_transit',
+    );
+    if (existingSuccess)
+      throw new BadRequestException('Order already booked with courier');
 
     // Validate delivery info
-    if (!order.customer_phone || !order.shipping_address || !order.customer_name) {
-      throw new BadRequestException('Missing customer delivery information (name, phone, or address)');
+    if (
+      !order.customer_phone ||
+      !order.shipping_address ||
+      !order.customer_name
+    ) {
+      throw new BadRequestException(
+        'Missing customer delivery information (name, phone, or address)',
+      );
     }
 
     // Create or find booking record
@@ -94,37 +113,41 @@ export class DeliveryService {
       booking = await this.prisma.deliveryBooking.create({
         data: {
           order_id: orderId,
-          delivery_status: 'pending'
-        }
+          delivery_status: 'pending',
+        },
       });
     }
 
     try {
       // 1. Get Pathao Credentials from Settings
       const settings = await this.prisma.setting.findMany({
-        where: { group: 'delivery' }
+        where: { group: 'delivery' },
       });
-      
-      const encryptionKey = this.configService.get<string>('SETTINGS_ENCRYPTION_KEY') || 'default_secret_key';
 
-      let apiKey = settings.find(s => s.key === 'pathao_api_key')?.value;
+      const encryptionKey =
+        this.configService.get<string>('SETTINGS_ENCRYPTION_KEY') ||
+        'default_secret_key';
+
+      let apiKey = settings.find((s) => s.key === 'pathao_api_key')?.value;
       if (apiKey) {
         apiKey = decrypt(apiKey, encryptionKey);
       } else {
         apiKey = process.env.PATHAO_API_KEY;
       }
 
-      let secret = settings.find(s => s.key === 'pathao_secret')?.value;
+      let secret = settings.find((s) => s.key === 'pathao_secret')?.value;
       if (secret) {
         secret = decrypt(secret, encryptionKey);
       } else {
         secret = process.env.PATHAO_API_SECRET;
       }
 
-      const storeId = settings.find(s => s.key === 'pathao_store_id')?.value;
-      const username = settings.find(s => s.key === 'pathao_username')?.value || process.env.PATHAO_USERNAME;
-      
-      let password = settings.find(s => s.key === 'pathao_password')?.value;
+      const storeId = settings.find((s) => s.key === 'pathao_store_id')?.value;
+      const username =
+        settings.find((s) => s.key === 'pathao_username')?.value ||
+        process.env.PATHAO_USERNAME;
+
+      let password = settings.find((s) => s.key === 'pathao_password')?.value;
       if (password) {
         password = decrypt(password, encryptionKey);
       } else {
@@ -140,12 +163,13 @@ export class DeliveryService {
       }
 
       // 2. Fetch OAuth token from Pathao
-      const grantType = (username && password) ? 'password' : 'client_credentials';
+      const grantType =
+        username && password ? 'password' : 'client_credentials';
 
       const tokenPayload: any = {
         client_id: apiKey,
         client_secret: secret,
-        grant_type: grantType
+        grant_type: grantType,
       };
 
       if (grantType === 'password') {
@@ -153,20 +177,27 @@ export class DeliveryService {
         tokenPayload.password = password;
       }
 
-      const tokenRes = await axios.post('https://api-hermes.pathao.com/aladdin/api/v1/issue-token', tokenPayload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+      const tokenRes = await axios.post(
+        'https://api-hermes.pathao.com/aladdin/api/v1/issue-token',
+        tokenPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+        },
+      );
 
       const token = tokenRes.data.access_token;
-      if (!token) throw new Error('Failed to retrieve access token from Pathao');
+      if (!token)
+        throw new Error('Failed to retrieve access token from Pathao');
 
       // 3. Calculate Cash on Delivery (COD) amount to collect
-      const amountToCollect = (order.payment_method?.toLowerCase() === 'cod' && order.payment_status !== 'paid') 
-        ? Number(order.total_amount) 
-        : 0;
+      const amountToCollect =
+        order.payment_method?.toLowerCase() === 'cod' &&
+        order.payment_status !== 'paid'
+          ? Number(order.total_amount)
+          : 0;
 
       // 4. Create Order Booking in Pathao
       const bookingPayload = {
@@ -177,24 +208,30 @@ export class DeliveryService {
         recipient_address: order.shipping_address,
         delivery_type: 48, // 48: Normal, 12: On Demand
         item_type: 2, // 2: Parcel
-        special_instruction: "Handle with care. Call before delivery.",
+        special_instruction: 'Handle with care. Call before delivery.',
         item_quantity: 1,
-        item_weight: "0.5",
-        item_description: "Organic products",
-        amount_to_collect: amountToCollect
+        item_weight: '0.5',
+        item_description: 'Organic products',
+        amount_to_collect: amountToCollect,
       };
 
-      const bookRes = await axios.post('https://api-hermes.pathao.com/aladdin/api/v1/orders', bookingPayload, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+      const bookRes = await axios.post(
+        'https://api-hermes.pathao.com/aladdin/api/v1/orders',
+        bookingPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+        },
+      );
 
       const responseData = bookRes.data;
       if (!responseData || responseData.code !== 200 || !responseData.data) {
-        throw new Error(responseData?.message || 'Pathao API returned an error response');
+        throw new Error(
+          responseData?.message || 'Pathao API returned an error response',
+        );
       }
 
       const pathaoOrder = responseData.data;
@@ -206,14 +243,14 @@ export class DeliveryService {
           consignment_id: pathaoOrder.consignment_id,
           tracking_id: pathaoOrder.tracking_id || pathaoOrder.consignment_id,
           delivery_status: 'booked',
-          booking_response: responseData as any
-        }
+          booking_response: responseData,
+        },
       });
 
       // 6. Update Order Status
       await this.prisma.order.update({
         where: { id: orderId },
-        data: { order_status: 'processing' }
+        data: { order_status: 'processing' },
       });
 
       // 7. Activity Log
@@ -223,8 +260,11 @@ export class DeliveryService {
           action: 'courier_booked',
           entity_type: 'order',
           entity_id: orderId,
-          details: { courier: 'pathao', tracking_id: pathaoOrder.tracking_id || pathaoOrder.consignment_id }
-        }
+          details: {
+            courier: 'pathao',
+            tracking_id: pathaoOrder.tracking_id || pathaoOrder.consignment_id,
+          },
+        },
       });
 
       // 8. Notification
@@ -233,18 +273,22 @@ export class DeliveryService {
           user_id: order.user_id,
           type: 'delivery_update',
           title: 'Order Handed to Courier',
-          message: `Your order ${order.order_number} has been handed over to Pathao. Tracking ID: ${pathaoOrder.tracking_id || pathaoOrder.consignment_id}`
-        }
+          message: `Your order ${order.order_number} has been handed over to Pathao. Tracking ID: ${pathaoOrder.tracking_id || pathaoOrder.consignment_id}`,
+        },
       });
 
-      return { success: true, tracking_id: pathaoOrder.tracking_id || pathaoOrder.consignment_id };
-
+      return {
+        success: true,
+        tracking_id: pathaoOrder.tracking_id || pathaoOrder.consignment_id,
+      };
     } catch (error: any) {
       let errorMsg = error.message;
       if (error.response?.data) {
-        errorMsg = typeof error.response.data === 'string'
-          ? error.response.data
-          : (error.response.data.message || JSON.stringify(error.response.data.errors || error.response.data));
+        errorMsg =
+          typeof error.response.data === 'string'
+            ? error.response.data
+            : error.response.data.message ||
+              JSON.stringify(error.response.data.errors || error.response.data);
       }
 
       // Log retry
@@ -252,8 +296,8 @@ export class DeliveryService {
         data: {
           booking_id: booking.id,
           error_message: errorMsg,
-          retry_number: booking.retry_count + 1
-        }
+          retry_number: booking.retry_count + 1,
+        },
       });
 
       await this.prisma.deliveryBooking.update({
@@ -261,8 +305,8 @@ export class DeliveryService {
         data: {
           delivery_status: 'failed',
           retry_count: { increment: 1 },
-          last_retry_at: new Date()
-        }
+          last_retry_at: new Date(),
+        },
       });
 
       throw new BadRequestException(`Courier booking failed: ${errorMsg}`);
@@ -271,10 +315,11 @@ export class DeliveryService {
 
   async retryBooking(adminId: string, bookingId: string) {
     const booking = await this.prisma.deliveryBooking.findUnique({
-      where: { id: bookingId }
+      where: { id: bookingId },
     });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.retry_count >= 5) throw new BadRequestException('Retry limit exceeded for this booking');
+    if (booking.retry_count >= 5)
+      throw new BadRequestException('Retry limit exceeded for this booking');
 
     return this.bookCourier(adminId, booking.order_id);
   }
@@ -282,9 +327,10 @@ export class DeliveryService {
   async syncTracking(adminId: string, bookingId: string) {
     const booking = await this.prisma.deliveryBooking.findUnique({
       where: { id: bookingId },
-      include: { order: true }
+      include: { order: true },
     });
-    if (!booking || !booking.tracking_id) throw new BadRequestException('No tracking ID available');
+    if (!booking || !booking.tracking_id)
+      throw new BadRequestException('No tracking ID available');
 
     // Mock Status Sync
     const statuses = ['in_transit', 'delivered', 'returned', 'failed'];
@@ -296,38 +342,40 @@ export class DeliveryService {
         booking_id: bookingId,
         status: randomStatus,
         location: 'Dhaka Hub',
-        message: `Package status updated to ${randomStatus}`
-      }
+        message: `Package status updated to ${randomStatus}`,
+      },
     });
 
     // Update booking status
     await this.prisma.deliveryBooking.update({
       where: { id: bookingId },
-      data: { delivery_status: randomStatus }
+      data: { delivery_status: randomStatus },
     });
 
     // Handle Order status updates
     if (randomStatus === 'delivered') {
       await this.prisma.order.update({
         where: { id: booking.order_id },
-        data: { 
+        data: {
           order_status: 'delivered',
           payment_status: 'paid',
-          delivered_at: new Date()
-        }
+          delivered_at: new Date(),
+        },
       });
       // Log history
       await this.prisma.orderStatusHistory.create({
         data: {
           order_id: booking.order_id,
           status: 'delivered',
-          notes: 'Auto-updated via courier sync'
-        }
+          notes: 'Auto-updated via courier sync',
+        },
       });
     } else if (randomStatus === 'returned' || randomStatus === 'failed') {
-       await this.prisma.order.update({
+      await this.prisma.order.update({
         where: { id: booking.order_id },
-        data: { order_status: randomStatus === 'returned' ? 'returned' : 'cancelled' }
+        data: {
+          order_status: randomStatus === 'returned' ? 'returned' : 'cancelled',
+        },
       });
     }
 
@@ -338,8 +386,8 @@ export class DeliveryService {
         action: 'delivery_sync',
         entity_type: 'order',
         entity_id: booking.order_id,
-        details: { status: randomStatus }
-      }
+        details: { status: randomStatus },
+      },
     });
 
     return { success: true, status: randomStatus };
@@ -349,7 +397,7 @@ export class DeliveryService {
     // Process Pathao webhook
     const { consignment_id, status } = data;
     const booking = await this.prisma.deliveryBooking.findFirst({
-      where: { consignment_id }
+      where: { consignment_id },
     });
 
     if (!booking) return { success: false, message: 'Booking not found' };
@@ -359,25 +407,25 @@ export class DeliveryService {
       data: {
         booking_id: booking.id,
         status: status,
-        raw_data: data
-      }
+        raw_data: data,
+      },
     });
 
     await this.prisma.deliveryBooking.update({
       where: { id: booking.id },
-      data: { delivery_status: status }
+      data: { delivery_status: status },
     });
 
     // Logic for order status updates based on status (similar to syncTracking)
     if (status === 'Delivered' || status === 'delivered') {
-        await this.prisma.order.update({
-            where: { id: booking.order_id },
-            data: { 
-              order_status: 'delivered',
-              payment_status: 'paid',
-              delivered_at: new Date()
-            }
-        });
+      await this.prisma.order.update({
+        where: { id: booking.order_id },
+        data: {
+          order_status: 'delivered',
+          payment_status: 'paid',
+          delivered_at: new Date(),
+        },
+      });
     }
 
     return { success: true };

@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { PlaceOrderDto } from './dto/order.dto';
@@ -11,11 +15,11 @@ import { Response } from 'express';
 @Injectable()
 export class OrdersService {
   constructor(
-    private prisma: PrismaService, 
+    private prisma: PrismaService,
     private jwtService: JwtService,
     private notifications: NotificationsService,
     private activityLogs: ActivityLogsService,
-    private fraudService: FraudService
+    private fraudService: FraudService,
   ) {}
 
   private extractUserId(authHeader?: string): string | null {
@@ -23,7 +27,9 @@ export class OrdersService {
     const token = authHeader.split(' ')[1];
     if (!token) return null;
     try {
-      const decoded = this.jwtService.verify(token, { secret: process.env.JWT_ACCESS_SECRET || 'access_secret' });
+      const decoded = this.jwtService.verify(token, {
+        secret: process.env.JWT_ACCESS_SECRET || 'access_secret',
+      });
       return decoded.sub;
     } catch {
       return null;
@@ -32,7 +38,7 @@ export class OrdersService {
 
   private async validateCoupon(code: string, subtotal: number) {
     const coupon = await this.prisma.coupon.findUnique({
-      where: { code: code.toUpperCase() }
+      where: { code: code.toUpperCase() },
     });
 
     if (!coupon) {
@@ -48,7 +54,9 @@ export class OrdersService {
       throw new BadRequestException('Coupon usage limit reached');
     }
     if (subtotal < Number(coupon.min_order_amount)) {
-      throw new BadRequestException(`Minimum order amount of ৳${coupon.min_order_amount} not met for this coupon`);
+      throw new BadRequestException(
+        `Minimum order amount of ৳${coupon.min_order_amount} not met for this coupon`,
+      );
     }
 
     let discount = 0;
@@ -64,9 +72,14 @@ export class OrdersService {
     return Math.min(discount, subtotal);
   }
 
-  async checkoutSummary(sessionId: string, authHeader: string, zone?: string, couponCode?: string) {
+  async checkoutSummary(
+    sessionId: string,
+    authHeader: string,
+    zone?: string,
+    couponCode?: string,
+  ) {
     const userId = this.extractUserId(authHeader);
-    
+
     if (!userId && !sessionId) throw new BadRequestException('Cart is empty');
 
     const cart = await this.prisma.cart.findFirst({
@@ -74,25 +87,30 @@ export class OrdersService {
         status: 'active',
         OR: [
           ...(userId ? [{ user_id: userId }] : []),
-          ...(sessionId ? [{ session_id: sessionId }] : [])
-        ]
+          ...(sessionId ? [{ session_id: sessionId }] : []),
+        ],
       },
       include: {
         items: {
-          include: { product: true }
-        }
-      }
+          include: { product: true },
+        },
+      },
     });
 
     if (!cart || cart.items.length === 0) {
       throw new BadRequestException('Cart is empty');
     }
 
-    const subtotal = cart.items.reduce((acc, item) => acc + (Number(item.price) * item.quantity), 0);
-    
+    const subtotal = cart.items.reduce(
+      (acc, item) => acc + Number(item.price) * item.quantity,
+      0,
+    );
+
     // Calculate delivery charge
     let delivery_charge = 0;
-    const hasFreeDeliveryProduct = cart.items.some(item => (item as any).product?.is_free_delivery);
+    const hasFreeDeliveryProduct = cart.items.some(
+      (item) => (item as any).product?.is_free_delivery,
+    );
     if (!hasFreeDeliveryProduct) {
       if (zone === 'inside_dhaka') delivery_charge = 80;
       else if (zone === 'outside_dhaka') delivery_charge = 120;
@@ -110,13 +128,13 @@ export class OrdersService {
       subtotal,
       delivery_charge,
       discount,
-      total_amount
+      total_amount,
     };
   }
 
   async placeOrder(sessionId: string, authHeader: string, dto: PlaceOrderDto) {
     const userId = this.extractUserId(authHeader);
-    
+
     if (!userId && !sessionId) throw new BadRequestException('Cart is empty');
 
     const cart = await this.prisma.cart.findFirst({
@@ -124,17 +142,17 @@ export class OrdersService {
         status: 'active',
         OR: [
           ...(userId ? [{ user_id: userId }] : []),
-          ...(sessionId ? [{ session_id: sessionId }] : [])
-        ]
+          ...(sessionId ? [{ session_id: sessionId }] : []),
+        ],
       },
       include: {
         items: {
           include: {
             product: true,
-            variant: true
-          }
-        }
-      }
+            variant: true,
+          },
+        },
+      },
     });
 
     if (!cart || cart.items.length === 0) {
@@ -143,14 +161,23 @@ export class OrdersService {
 
     // Re-check stock
     for (const item of cart.items) {
-      const available = item.variant ? item.variant.stock : item.product.stock_quantity;
+      const available = item.variant
+        ? item.variant.stock
+        : item.product.stock_quantity;
       if (available < item.quantity) {
-        throw new BadRequestException(`Product ${item.product.name} is out of stock`);
+        throw new BadRequestException(
+          `Product ${item.product.name} is out of stock`,
+        );
       }
     }
 
-    const summary = await this.checkoutSummary(sessionId, authHeader, dto.zone, dto.coupon_code);
-    
+    const summary = await this.checkoutSummary(
+      sessionId,
+      authHeader,
+      dto.zone,
+      dto.coupon_code,
+    );
+
     let finalUserId: string | null = userId;
     let customerId: string | null = null;
     let autoAccountCreated = false;
@@ -162,13 +189,15 @@ export class OrdersService {
     // Guest checkout logic
     if (!userId) {
       const searchEmailOrPhone: any[] = [];
-      if (dto.customer_email) searchEmailOrPhone.push({ email: dto.customer_email });
-      if (dto.customer_phone) searchEmailOrPhone.push({ phone: dto.customer_phone });
+      if (dto.customer_email)
+        searchEmailOrPhone.push({ email: dto.customer_email });
+      if (dto.customer_phone)
+        searchEmailOrPhone.push({ phone: dto.customer_phone });
 
       if (searchEmailOrPhone.length > 0) {
         const existingUser = await this.prisma.user.findFirst({
           where: { OR: searchEmailOrPhone },
-          include: { customer: true }
+          include: { customer: true },
         });
 
         if (existingUser) {
@@ -186,15 +215,16 @@ export class OrdersService {
               phone: dto.customer_phone,
               email: dto.customer_email || undefined,
               account_type: 'guest_auto',
-              is_password_set: false
-            }
+              is_password_set: false,
+            },
           });
           finalUserId = newUser.id;
           autoAccountCreated = true;
           accountType = 'guest_auto';
           setPasswordAvailable = true;
-          accountMessage = 'Your account has been created using your phone number';
-          
+          accountMessage =
+            'Your account has been created using your phone number';
+
           const newCustomer = await this.prisma.customer.create({
             data: {
               user_id: newUser.id,
@@ -202,34 +232,36 @@ export class OrdersService {
               phone: dto.customer_phone,
               email: dto.customer_email || undefined,
               address: dto.shipping_address,
-              source_type: 'guest_checkout'
-            }
+              source_type: 'guest_checkout',
+            },
           });
           customerId = newCustomer.id;
         }
       }
     } else {
       // Logged in user, get customer
-      const existingCustomer = await this.prisma.customer.findUnique({ where: { user_id: userId } });
+      const existingCustomer = await this.prisma.customer.findUnique({
+        where: { user_id: userId },
+      });
       if (existingCustomer) {
         customerId = existingCustomer.id;
       } else {
         const newCustomer = await this.prisma.customer.create({
-            data: {
-              user_id: userId,
-              name: dto.customer_name,
-              phone: dto.customer_phone,
-              email: dto.customer_email || undefined,
-              address: dto.shipping_address,
-              source_type: 'logged_in_checkout'
-            }
-          });
-          customerId = newCustomer.id;
+          data: {
+            user_id: userId,
+            name: dto.customer_name,
+            phone: dto.customer_phone,
+            email: dto.customer_email || undefined,
+            address: dto.shipping_address,
+            source_type: 'logged_in_checkout',
+          },
+        });
+        customerId = newCustomer.id;
       }
     }
 
     const orderNumber = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
- 
+
     // Create Order
     const order = await this.prisma.order.create({
       data: {
@@ -250,14 +282,14 @@ export class OrdersService {
         auto_account_created: autoAccountCreated,
         account_created_user_id: autoAccountCreated ? finalUserId : null,
         order_source_type: !userId ? 'guest_checkout' : 'logged_in_checkout',
-        order_status: 'pending' // Default to pending, fraud check will update if needed
-      }
+        order_status: 'pending', // Default to pending, fraud check will update if needed
+      },
     });
 
     if (autoAccountCreated && finalUserId) {
       await this.prisma.user.update({
         where: { id: finalUserId },
-        data: { auto_created_from_order_id: order.id }
+        data: { auto_created_from_order_id: order.id },
       });
     }
 
@@ -272,20 +304,20 @@ export class OrdersService {
           variant_name: item.variant ? item.variant.name : null,
           quantity: item.quantity,
           unit_price: item.price,
-          total_price: Number(item.price) * item.quantity
-        }
+          total_price: Number(item.price) * item.quantity,
+        },
       });
 
       // Deduct stock
       if (item.variant_id) {
         await this.prisma.productVariant.update({
           where: { id: item.variant_id },
-          data: { stock: { decrement: item.quantity } }
+          data: { stock: { decrement: item.quantity } },
         });
       } else {
         await this.prisma.product.update({
           where: { id: item.product_id },
-          data: { stock_quantity: { decrement: item.quantity } }
+          data: { stock_quantity: { decrement: item.quantity } },
         });
       }
     }
@@ -294,7 +326,7 @@ export class OrdersService {
     if (dto.coupon_code) {
       await this.prisma.coupon.update({
         where: { code: dto.coupon_code.toUpperCase() },
-        data: { used_count: { increment: 1 } }
+        data: { used_count: { increment: 1 } },
       });
     }
 
@@ -303,7 +335,7 @@ export class OrdersService {
       order.id,
       dto.customer_phone,
       dto.shipping_address,
-      cart.items
+      cart.items,
     );
 
     const isSuspicious = fraudResult.fraudScore >= 30;
@@ -316,14 +348,16 @@ export class OrdersService {
     // Update cart
     await this.prisma.cart.update({
       where: { id: cart.id },
-      data: { status: 'ordered' }
+      data: { status: 'ordered' },
     });
 
     // Notifications
     await this.notifications.create({
       type: isSuspicious ? 'fraud-alert' : 'new-order',
-      title: isSuspicious ? `Suspicious Order ${orderNumber}` : `New Order ${orderNumber}`,
-      message: `Order placed by ${dto.customer_name} for ৳${summary.total_amount}`
+      title: isSuspicious
+        ? `Suspicious Order ${orderNumber}`
+        : `New Order ${orderNumber}`,
+      message: `Order placed by ${dto.customer_name} for ৳${summary.total_amount}`,
     });
 
     // Activity log
@@ -335,7 +369,7 @@ export class OrdersService {
       entity_type: 'order',
       entity_id: order.id,
       description: `Order ${orderNumber} placed by ${dto.customer_name}`,
-      details: { order_number: orderNumber, total: summary.total_amount }
+      details: { order_number: orderNumber, total: summary.total_amount },
     });
 
     return {
@@ -345,21 +379,21 @@ export class OrdersService {
       existing_account_used: existingAccountUsed,
       account_type: accountType,
       account_message: accountMessage,
-      set_password_available: setPasswordAvailable
+      set_password_available: setPasswordAvailable,
     };
   }
 
   async getOrderSuccess(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { order_items: true }
+      include: { order_items: true },
     });
     if (!order) throw new NotFoundException('Order not found');
-    
+
     const orderCount = await this.prisma.order.count({
-      where: { customer_phone: order.customer_phone }
+      where: { customer_phone: order.customer_phone },
     });
-    
+
     return {
       order_number: order.order_number,
       customer_name: order.customer_name,
@@ -372,24 +406,21 @@ export class OrdersService {
       shipping_address: order.shipping_address,
       auto_account_created: order.auto_account_created,
       account_created_user_id: order.account_created_user_id,
-      order_count: orderCount
+      order_count: orderCount,
     };
   }
 
   async trackOrder(query: string) {
     const order = await this.prisma.order.findFirst({
       where: {
-        OR: [
-          { order_number: query },
-          { customer_phone: query }
-        ]
+        OR: [{ order_number: query }, { customer_phone: query }],
       },
       include: {
         status_history: {
-          orderBy: { created_at: 'desc' }
+          orderBy: { created_at: 'desc' },
         },
-        order_items: true
-      }
+        order_items: true,
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
@@ -403,14 +434,23 @@ export class OrdersService {
     return this.prisma.order.findMany({
       where: { user_id: userId },
       orderBy: { created_at: 'desc' },
-      include: { order_items: true }
+      include: { order_items: true },
     });
   }
 
   // Admin Methods
 
   async getAdminOrders(filters: any) {
-    const { search, status, source, guest_only, start_date, end_date, page = 1, limit = 10 } = filters;
+    const {
+      search,
+      status,
+      source,
+      guest_only,
+      start_date,
+      end_date,
+      page = 1,
+      limit = 10,
+    } = filters;
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = { deleted_at: null };
@@ -419,14 +459,14 @@ export class OrdersService {
       where.OR = [
         { order_number: { contains: search, mode: 'insensitive' } },
         { customer_phone: { contains: search, mode: 'insensitive' } },
-        { customer_name: { contains: search, mode: 'insensitive' } }
+        { customer_name: { contains: search, mode: 'insensitive' } },
       ];
     }
 
     if (status) where.order_status = status;
     if (source) where.order_source_type = source;
     if (guest_only === 'true') where.is_guest_order = true;
-    
+
     if (start_date || end_date) {
       where.created_at = {};
       if (start_date) where.created_at.gte = new Date(start_date);
@@ -441,10 +481,10 @@ export class OrdersService {
         orderBy: { created_at: 'desc' },
         include: {
           user: { select: { name: true, phone: true, account_type: true } },
-          customer: { select: { source_type: true } }
-        }
+          customer: { select: { source_type: true } },
+        },
       }),
-      this.prisma.order.count({ where })
+      this.prisma.order.count({ where }),
     ]);
 
     return {
@@ -453,8 +493,8 @@ export class OrdersService {
         total,
         page: Number(page),
         limit: Number(limit),
-        last_page: Math.ceil(total / Number(limit))
-      }
+        last_page: Math.ceil(total / Number(limit)),
+      },
     };
   }
 
@@ -466,8 +506,8 @@ export class OrdersService {
         status_history: { orderBy: { created_at: 'desc' } },
         user: true,
         customer: true,
-        payments: true
-      }
+        payments: true,
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
@@ -477,7 +517,7 @@ export class OrdersService {
   async updateOrder(adminId: string, id: string, dto: any) {
     const order = await this.prisma.order.update({
       where: { id },
-      data: dto
+      data: dto,
     });
 
     await this.prisma.activityLog.create({
@@ -486,15 +526,23 @@ export class OrdersService {
         action: 'admin_update_order',
         entity_type: 'order',
         entity_id: id,
-        details: dto
-      }
+        details: dto,
+      },
     });
 
     return order;
   }
 
-  async updateOrderStatus(adminId: string, id: string, status: string, reason?: string) {
-    const order = await this.prisma.order.findUnique({ where: { id }, include: { order_items: true } });
+  async updateOrderStatus(
+    adminId: string,
+    id: string,
+    status: string,
+    reason?: string,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { order_items: true },
+    });
     if (!order) throw new NotFoundException('Order not found');
 
     const oldStatus = order.order_status;
@@ -502,47 +550,55 @@ export class OrdersService {
 
     // Transition validation (simplified)
     const invalidTransitions: Record<string, string[]> = {
-      'delivered': ['cancelled', 'pending'],
-      'cancelled': ['delivered', 'confirmed', 'processing', 'shipped'],
-      'returned': ['delivered', 'confirmed', 'processing', 'shipped']
+      delivered: ['cancelled', 'pending'],
+      cancelled: ['delivered', 'confirmed', 'processing', 'shipped'],
+      returned: ['delivered', 'confirmed', 'processing', 'shipped'],
     };
 
     if (invalidTransitions[oldStatus || '']?.includes(status)) {
-      throw new BadRequestException(`Cannot change status from ${oldStatus} to ${status}`);
+      throw new BadRequestException(
+        `Cannot change status from ${oldStatus} to ${status}`,
+      );
     }
 
     return await this.prisma.$transaction(async (tx) => {
       const updatedOrder = await tx.order.update({
         where: { id },
-        data: { 
+        data: {
           order_status: status,
-          ...(status === 'delivered' ? { 
-            delivered_at: new Date(),
-            payment_status: 'paid'
-          } : {})
-        }
+          ...(status === 'delivered'
+            ? {
+                delivered_at: new Date(),
+                payment_status: 'paid',
+              }
+            : {}),
+        },
       });
 
       await tx.orderStatusHistory.create({
         data: {
           order_id: id,
           status,
-          notes: reason
-        }
+          notes: reason,
+        },
       });
 
       // Stock Restoration
-      if ((status === 'cancelled' || status === 'returned') && oldStatus !== 'cancelled' && oldStatus !== 'returned') {
+      if (
+        (status === 'cancelled' || status === 'returned') &&
+        oldStatus !== 'cancelled' &&
+        oldStatus !== 'returned'
+      ) {
         for (const item of order.order_items) {
           if (item.variant_id) {
             await tx.productVariant.update({
               where: { id: item.variant_id },
-              data: { stock: { increment: item.quantity } }
+              data: { stock: { increment: item.quantity } },
             });
           } else {
             await tx.product.update({
               where: { id: item.product_id },
-              data: { stock_quantity: { increment: item.quantity } }
+              data: { stock_quantity: { increment: item.quantity } },
             });
           }
         }
@@ -555,8 +611,8 @@ export class OrdersService {
           await tx.customer.update({
             where: { id: order.customer_id },
             data: {
-              account_completed_at: new Date() // Mark as active customer
-            }
+              account_completed_at: new Date(), // Mark as active customer
+            },
           });
         }
       }
@@ -590,8 +646,8 @@ export class OrdersService {
           action: 'status_updated',
           entity_type: 'order',
           entity_id: id,
-          details: { from: oldStatus, to: status, reason }
-        }
+          details: { from: oldStatus, to: status, reason },
+        },
       });
 
       await tx.notification.create({
@@ -599,8 +655,8 @@ export class OrdersService {
           user_id: order.user_id,
           type: 'order_status_update',
           title: `Order ${order.order_number} ${status}`,
-          message: `Your order status has been updated to ${status}`
-        }
+          message: `Your order status has been updated to ${status}`,
+        },
       });
 
       return updatedOrder;
@@ -610,7 +666,7 @@ export class OrdersService {
   async deleteOrder(adminId: string, id: string) {
     const order = await this.prisma.order.update({
       where: { id },
-      data: { deleted_at: new Date() }
+      data: { deleted_at: new Date() },
     });
 
     await this.prisma.activityLog.create({
@@ -618,16 +674,17 @@ export class OrdersService {
         user_id: adminId,
         action: 'order_deleted',
         entity_type: 'order',
-        entity_id: id
-      }
+        entity_id: id,
+      },
     });
 
     return order;
   }
 
   async createManualOrder(adminId: string, dto: any) {
-    const orderNumber = 'ORD-MAN-' + Math.floor(100000 + Math.random() * 900000);
-    
+    const orderNumber =
+      'ORD-MAN-' + Math.floor(100000 + Math.random() * 900000);
+
     // This is a simplified manual order creation
     const order = await this.prisma.order.create({
       data: {
@@ -641,8 +698,8 @@ export class OrdersService {
         payment_method: dto.payment_method || 'cod',
         order_status: dto.status || 'confirmed',
         order_source_type: 'admin_manual',
-        is_guest_order: true
-      }
+        is_guest_order: true,
+      },
     });
 
     // Add items
@@ -656,20 +713,20 @@ export class OrdersService {
             product_name: item.product_name,
             quantity: item.quantity,
             unit_price: item.unit_price,
-            total_price: item.unit_price * item.quantity
-          }
+            total_price: item.unit_price * item.quantity,
+          },
         });
-        
+
         // Deduct stock
         if (item.variant_id) {
           await this.prisma.productVariant.update({
             where: { id: item.variant_id },
-            data: { stock: { decrement: item.quantity } }
+            data: { stock: { decrement: item.quantity } },
           });
         } else {
           await this.prisma.product.update({
             where: { id: item.product_id },
-            data: { stock_quantity: { decrement: item.quantity } }
+            data: { stock_quantity: { decrement: item.quantity } },
           });
         }
       }
@@ -681,8 +738,8 @@ export class OrdersService {
         action: 'manual_order_created',
         entity_type: 'order',
         entity_id: order.id,
-        details: { order_number: orderNumber }
-      }
+        details: { order_number: orderNumber },
+      },
     });
 
     return order;
@@ -722,7 +779,7 @@ export class OrdersService {
       { header: 'Source', key: 'order_source_type', width: 15 },
     ];
 
-    orders.forEach(o => {
+    orders.forEach((o) => {
       worksheet.addRow({
         order_number: o.order_number,
         created_at: o.created_at.toISOString(),
@@ -734,7 +791,10 @@ export class OrdersService {
       });
     });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
     res.setHeader('Content-Disposition', 'attachment; filename=orders.xlsx');
 
     await workbook.xlsx.write(res);
@@ -753,18 +813,18 @@ export class OrdersService {
       where: {
         customer_id: customerId,
         deleted_at: null,
-        order_status: { notIn: ['cancelled', 'returned'] }
+        order_status: { notIn: ['cancelled', 'returned'] },
       },
       _count: { id: true },
-      _sum: { total_amount: true }
+      _sum: { total_amount: true },
     });
 
     await tx.customer.update({
       where: { id: customerId },
       data: {
         total_orders: stats._count.id || 0,
-        total_spend: stats._sum.total_amount || 0
-      }
+        total_spend: stats._sum.total_amount || 0,
+      },
     });
   }
 }

@@ -21,16 +21,19 @@ export class NotificationsService {
     });
   }
 
-  async findAll(query: { page?: number; limit?: number; user_id?: string; unread?: string; type?: string }) {
+  async findAll(query: {
+    page?: number;
+    limit?: number;
+    user_id?: string;
+    unread?: string;
+    type?: string;
+  }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
 
     const where: any = {
-      OR: [
-        { user_id: query.user_id },
-        { user_id: null },
-      ],
+      OR: [{ user_id: query.user_id }, { user_id: null }],
     };
 
     if (query.unread === 'true') {
@@ -66,10 +69,7 @@ export class NotificationsService {
     return this.prisma.notification.count({
       where: {
         is_read: false,
-        OR: [
-          { user_id: userId },
-          { user_id: null },
-        ],
+        OR: [{ user_id: userId }, { user_id: null }],
       },
     });
   }
@@ -80,9 +80,9 @@ export class NotificationsService {
     });
 
     if (!notification) throw new NotFoundException('Notification not found');
-    
+
     if (notification.user_id && notification.user_id !== userId) {
-       throw new NotFoundException('Notification not found');
+      throw new NotFoundException('Notification not found');
     }
 
     return this.prisma.notification.update({
@@ -95,10 +95,7 @@ export class NotificationsService {
     return this.prisma.notification.updateMany({
       where: {
         is_read: false,
-        OR: [
-          { user_id: userId },
-          { user_id: null },
-        ],
+        OR: [{ user_id: userId }, { user_id: null }],
       },
       data: { is_read: true },
     });

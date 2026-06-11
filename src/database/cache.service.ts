@@ -10,7 +10,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     const host = this.configService.get('REDIS_HOST') || '127.0.0.1';
-    
+
     if (host === 'mock') {
       const RedisMock = require('ioredis-mock');
       this.redis = new RedisMock();

@@ -1,10 +1,24 @@
-import { Controller, Get, Patch, Post, Delete, Body, Param, UseGuards, Req, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { CustomersService } from './customers.service';
 import { CustomerAuthGuard } from '../auth/guards/customer-auth.guard';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 
-type AuthedReq = Request & { user: { sub: string; scope: 'customer' | 'admin' } };
+type AuthedReq = Request & {
+  user: { sub: string; scope: 'customer' | 'admin' };
+};
 
 @Controller('customer')
 @UseGuards(CustomerAuthGuard)
@@ -27,7 +41,10 @@ export class CustomersController {
   }
 
   @Post('addresses')
-  addAddress(@Req() req: AuthedReq, @Body() dto: { address: string; is_default?: boolean }) {
+  addAddress(
+    @Req() req: AuthedReq,
+    @Body() dto: { address: string; is_default?: boolean },
+  ) {
     return this.customersService.addAddress(req.user.sub, dto);
   }
 
@@ -35,7 +52,7 @@ export class CustomersController {
   updateAddress(
     @Req() req: AuthedReq,
     @Param('id') id: string,
-    @Body() dto: { address?: string; is_default?: boolean }
+    @Body() dto: { address?: string; is_default?: boolean },
   ) {
     return this.customersService.updateAddress(req.user.sub, id, dto);
   }

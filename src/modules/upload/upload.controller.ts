@@ -17,9 +17,11 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post('image')
-  @UseInterceptors(FileInterceptor('image', {
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB
-  }))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    }),
+  )
   async uploadImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');

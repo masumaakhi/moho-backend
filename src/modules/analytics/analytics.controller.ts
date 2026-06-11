@@ -19,12 +19,16 @@ export class AnalyticsController {
 
   @Get('analytics/revenue')
   getRevenueAnalytics(@Query('days') days?: string) {
-    return this.analyticsService.getRevenueAnalytics(days ? parseInt(days) : 30);
+    return this.analyticsService.getRevenueAnalytics(
+      days ? parseInt(days) : 30,
+    );
   }
 
   @Get('analytics/products')
   getBestSellingProducts(@Query('limit') limit?: string) {
-    return this.analyticsService.getBestSellingProducts(limit ? parseInt(limit) : 5);
+    return this.analyticsService.getBestSellingProducts(
+      limit ? parseInt(limit) : 5,
+    );
   }
 
   @Get('alerts')
@@ -42,4 +46,3 @@ export class AnalyticsController {
     return this.analyticsService.getSalesRevenueOrders();
   }
 }
-

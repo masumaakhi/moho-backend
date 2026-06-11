@@ -1,7 +1,23 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
 import { AdminUsersService } from './admin-users.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
-import { CreateAdminDto, UpdateAdminDto, UpdateAdminStatusDto } from './dto/admin-user.dto';
+import {
+  CreateAdminDto,
+  UpdateAdminDto,
+  UpdateAdminStatusDto,
+} from './dto/admin-user.dto';
 import { successResponse } from '../../common/responses/api-response';
 import { PrismaService } from '../../database/prisma.service';
 
@@ -45,16 +61,28 @@ export class AdminUsersController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateAdminDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateAdminDto,
+    @Req() req: any,
+  ) {
     await this.checkSuperAdmin(req);
     const data = await this.adminUsersService.update(id, req.user.sub, dto);
     return successResponse('Admin updated successfully', data);
   }
 
   @Patch(':id/status')
-  async updateStatus(@Param('id') id: string, @Body() dto: UpdateAdminStatusDto, @Req() req: any) {
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateAdminStatusDto,
+    @Req() req: any,
+  ) {
     await this.checkSuperAdmin(req);
-    const data = await this.adminUsersService.updateStatus(id, req.user.sub, dto);
+    const data = await this.adminUsersService.updateStatus(
+      id,
+      req.user.sub,
+      dto,
+    );
     return successResponse('Admin status updated successfully', data);
   }
 

@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { AdminCustomersService } from './admin-customers.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 
@@ -34,7 +45,11 @@ export class AdminCustomersController {
   }
 
   @Post(':id/notes')
-  addNote(@Param('id') id: string, @Body('note') note: string, @Req() req: any) {
+  addNote(
+    @Param('id') id: string,
+    @Body('note') note: string,
+    @Req() req: any,
+  ) {
     const adminId = req.user.sub;
     return this.customersService.addNote(id, adminId, note);
   }

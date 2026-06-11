@@ -21,7 +21,8 @@ export class UploadService {
         },
         (error, result) => {
           if (error) return reject(error);
-          if (!result) return reject(new Error('Upload failed: result is undefined'));
+          if (!result)
+            return reject(new Error('Upload failed: result is undefined'));
           resolve(result.secure_url);
         },
       );

@@ -41,7 +41,7 @@ export class TestimonialsService {
 
   async create(adminId: string, data: any) {
     const testimonial = await this.prisma.testimonial.create({ data });
-    
+
     await this.activityLogs.create({
       actor_type: 'admin',
       user_id: adminId,
@@ -56,15 +56,15 @@ export class TestimonialsService {
   }
 
   async createPublic(data: any) {
-    const testimonial = await this.prisma.testimonial.create({ 
+    const testimonial = await this.prisma.testimonial.create({
       data: {
         name: data.name,
         rating: data.rating,
         text: data.text,
         is_active: false, // Force hidden until admin approves
-      } 
+      },
     });
-    
+
     await this.activityLogs.create({
       actor_type: 'customer',
       action: 'submit_review',

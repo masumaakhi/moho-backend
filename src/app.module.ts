@@ -45,7 +45,7 @@ import { CouponsModule } from './modules/coupons/coupons.module';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
         const host = config.get('REDIS_HOST') || '127.0.0.1';
-        
+
         // If REDIS_HOST is set to 'mock', use ioredis-mock for local development without Redis
         if (host === 'mock') {
           const RedisMock = require('ioredis-mock');
@@ -63,7 +63,9 @@ import { CouponsModule } from './modules/coupons/coupons.module';
             // Add a long delay between retries to stop spamming the console
             retryStrategy: (times: number) => {
               if (times % 10 === 0) {
-                console.warn(`[Redis] Connection failed (Attempt ${times}). Please ensure Redis is running or set REDIS_HOST="mock" in .env`);
+                console.warn(
+                  `[Redis] Connection failed (Attempt ${times}). Please ensure Redis is running or set REDIS_HOST="mock" in .env`,
+                );
               }
               return Math.min(times * 1000, 30000); // Max 30s delay
             },

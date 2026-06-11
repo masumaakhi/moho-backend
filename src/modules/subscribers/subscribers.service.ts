@@ -86,7 +86,7 @@ export class SubscribersService {
       { header: 'Created At', key: 'created_at', width: 20 },
     ];
 
-    subscribers.forEach(s => {
+    subscribers.forEach((s) => {
       worksheet.addRow({
         id: s.id,
         email: s.email,
@@ -95,8 +95,14 @@ export class SubscribersService {
       });
     });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=subscribers.xlsx');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=subscribers.xlsx',
+    );
 
     await workbook.xlsx.write(res);
     res.end();

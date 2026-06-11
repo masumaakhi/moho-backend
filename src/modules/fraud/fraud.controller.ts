@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { FraudService } from './fraud.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 import { successResponse } from '../../common/responses/api-response';
@@ -15,13 +25,19 @@ export class FraudController {
   }
 
   @Post('numbers')
-  async addToBlacklist(@Body() body: { phone: string; reason?: string }, @Req() req: any) {
+  async addToBlacklist(
+    @Body() body: { phone: string; reason?: string },
+    @Req() req: any,
+  ) {
     const data = await this.fraudService.addToBlacklist(req.user.sub, body);
     return successResponse('Number added to blacklist', data);
   }
 
   @Patch('numbers/:id/status')
-  async updateStatus(@Param('id') id: string, @Body() body: { active: boolean }) {
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() body: { active: boolean },
+  ) {
     const data = await this.fraudService.updateBlacklistStatus(id, body.active);
     return successResponse('Blacklist status updated', data);
   }
@@ -33,8 +49,16 @@ export class FraudController {
   }
 
   @Patch('orders/:id/review')
-  async reviewOrder(@Param('id') id: string, @Body() body: { action: any }, @Req() req: any) {
-    const data = await this.fraudService.reviewOrder(req.user.sub, id, body.action);
+  async reviewOrder(
+    @Param('id') id: string,
+    @Body() body: { action: any },
+    @Req() req: any,
+  ) {
+    const data = await this.fraudService.reviewOrder(
+      req.user.sub,
+      id,
+      body.action,
+    );
     return successResponse(`Order review completed: ${body.action}`, data);
   }
 
@@ -45,7 +69,7 @@ export class FraudController {
       body.orderId,
       body.customerPhone,
       body.shippingAddress,
-      body.items
+      body.items,
     );
     return successResponse('Fraud check completed', data);
   }

@@ -18,8 +18,8 @@ export class PublicSettingsController {
       delivery_charge: {
         inside: data.delivery.delivery_charge_inside,
         outside: data.delivery.delivery_charge_outside,
-        default: data.delivery.delivery_charge_default
-      }
+        default: data.delivery.delivery_charge_default,
+      },
     });
   }
 }

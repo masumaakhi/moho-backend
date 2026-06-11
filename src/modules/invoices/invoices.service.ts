@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { Response } from 'express';
@@ -36,11 +40,11 @@ export class InvoicesService {
           order: {
             include: {
               user: {
-                select: { name: true, email: true, phone: true }
-              }
-            }
-          }
-        }
+                select: { name: true, email: true, phone: true },
+              },
+            },
+          },
+        },
       }),
       this.prisma.invoice.count({ where }),
     ]);
@@ -66,9 +70,9 @@ export class InvoicesService {
             order_items: { include: { product: true } },
             user: true,
             customer: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     if (!invoice) throw new NotFoundException('Invoice not found');
@@ -83,26 +87,29 @@ export class InvoicesService {
         order_items: { include: { product: true } },
         user: true,
         customer: true,
-      }
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
 
     // 2. Check existing invoice
     const existing = await this.prisma.invoice.findFirst({
-      where: { order_id: orderId, deleted_at: null }
+      where: { order_id: orderId, deleted_at: null },
     });
 
     if (existing) {
       return {
         success: true,
         message: 'Invoice already exists',
-        data: existing
+        data: existing,
       };
     }
 
     // 3. Calculate Totals
-    const subtotal = order.order_items.reduce((sum, item) => sum + Number(item.unit_price) * item.quantity, 0);
+    const subtotal = order.order_items.reduce(
+      (sum, item) => sum + Number(item.unit_price) * item.quantity,
+      0,
+    );
     const totalAmount = Number(order.total_amount);
     const deliveryCharge = Number(order.delivery_charge || 0);
     const discount = Number(order.discount_amount || 0);
@@ -122,7 +129,7 @@ export class InvoicesService {
         total_amount: totalAmount,
         status: 'generated',
         invoice_date: new Date(),
-      }
+      },
     });
 
     // 6. Log Activity
@@ -137,7 +144,7 @@ export class InvoicesService {
     return {
       success: true,
       message: 'Invoice generated successfully',
-      data: invoice
+      data: invoice,
     };
   }
 
@@ -151,9 +158,9 @@ export class InvoicesService {
               order_items: { include: { product: true } },
               user: true,
               customer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       });
 
       if (!invoice) throw new NotFoundException('Invoice not found');
@@ -163,7 +170,10 @@ export class InvoicesService {
       const doc = new PDFDoc({ margin: 50 });
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=invoice-${invoice.invoice_number}.pdf`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=invoice-${invoice.invoice_number}.pdf`,
+      );
 
       doc.pipe(res);
 
@@ -172,8 +182,12 @@ export class InvoicesService {
       doc.fontSize(10).text('Premium Organic Products', { align: 'left' });
       doc.moveDown();
 
-      doc.fontSize(12).text(`Invoice Number: ${invoice.invoice_number}`, { align: 'right' });
-      doc.text(`Date: ${invoice.invoice_date.toLocaleDateString()}`, { align: 'right' });
+      doc
+        .fontSize(12)
+        .text(`Invoice Number: ${invoice.invoice_number}`, { align: 'right' });
+      doc.text(`Date: ${invoice.invoice_date.toLocaleDateString()}`, {
+        align: 'right',
+      });
       doc.text(`Order ID: ${invoice.order_id}`, { align: 'right' });
       doc.moveDown();
 
@@ -195,16 +209,23 @@ export class InvoicesService {
       doc.text('Qty', 300, tableTop);
       doc.text('Price', 350, tableTop);
       doc.text('Total', 450, tableTop);
-      
-      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
-      
+
+      doc
+        .moveTo(50, tableTop + 15)
+        .lineTo(550, tableTop + 15)
+        .stroke();
+
       let currentY = tableTop + 25;
-      invoice.order.order_items.forEach(item => {
+      invoice.order.order_items.forEach((item) => {
         doc.text(item.product.name, 50, currentY);
         doc.text(item.quantity.toString(), 300, currentY);
         // Use 'Tk' instead of '৳' as standard fonts don't support the Taka symbol
         doc.text(`Tk ${item.unit_price}`, 350, currentY);
-        doc.text(`Tk ${Number(item.unit_price) * item.quantity}`, 450, currentY);
+        doc.text(
+          `Tk ${Number(item.unit_price) * item.quantity}`,
+          450,
+          currentY,
+        );
         currentY += 20;
       });
 
@@ -221,11 +242,19 @@ export class InvoicesService {
       doc.text('Discount:', 350, currentY);
       doc.text(`-Tk ${invoice.discount}`, 450, currentY);
       currentY += 15;
-      doc.fontSize(12).font('Helvetica-Bold').text('Total Amount:', 350, currentY);
+      doc
+        .fontSize(12)
+        .font('Helvetica-Bold')
+        .text('Total Amount:', 350, currentY);
       doc.text(`Tk ${invoice.total_amount}`, 450, currentY);
 
       doc.moveDown(4);
-      doc.fontSize(10).font('Helvetica').text('Thank you for shopping with Mohul Organic!', { align: 'center' });
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text('Thank you for shopping with Mohul Organic!', {
+          align: 'center',
+        });
 
       doc.end();
 
@@ -257,9 +286,9 @@ export class InvoicesService {
                 order_items: { include: { product: true } },
                 user: true,
                 customer: true,
-              }
-            }
-          }
+              },
+            },
+          },
         });
 
         if (!invoice) {
@@ -273,9 +302,9 @@ export class InvoicesService {
                     order_items: { include: { product: true } },
                     user: true,
                     customer: true,
-                  }
-                }
-              }
+                  },
+                },
+              },
             });
           }
         }
@@ -286,14 +315,19 @@ export class InvoicesService {
       }
 
       if (invoices.length === 0) {
-        throw new NotFoundException('No invoices found or generated for selected orders');
+        throw new NotFoundException(
+          'No invoices found or generated for selected orders',
+        );
       }
 
       const PDFDoc = require('pdfkit');
       const doc = new PDFDoc({ margin: 50 });
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=bulk-invoices.pdf`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=bulk-invoices.pdf`,
+      );
 
       doc.pipe(res);
 
@@ -307,8 +341,12 @@ export class InvoicesService {
         doc.fontSize(10).text('Premium Organic Products', { align: 'left' });
         doc.moveDown();
 
-        doc.fontSize(12).text(`Invoice Number: ${invoice.invoice_number}`, { align: 'right' });
-        doc.text(`Date: ${invoice.invoice_date.toLocaleDateString()}`, { align: 'right' });
+        doc.fontSize(12).text(`Invoice Number: ${invoice.invoice_number}`, {
+          align: 'right',
+        });
+        doc.text(`Date: ${invoice.invoice_date.toLocaleDateString()}`, {
+          align: 'right',
+        });
         doc.text(`Order ID: ${invoice.order_id}`, { align: 'right' });
         doc.moveDown();
 
@@ -330,15 +368,22 @@ export class InvoicesService {
         doc.text('Qty', 300, tableTop);
         doc.text('Price', 350, tableTop);
         doc.text('Total', 450, tableTop);
-        
-        doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
-        
+
+        doc
+          .moveTo(50, tableTop + 15)
+          .lineTo(550, tableTop + 15)
+          .stroke();
+
         let currentY = tableTop + 25;
-        invoice.order.order_items.forEach(item => {
+        invoice.order.order_items.forEach((item) => {
           doc.text(item.product?.name || item.product_name, 50, currentY);
           doc.text(item.quantity.toString(), 300, currentY);
           doc.text(`Tk ${item.unit_price}`, 350, currentY);
-          doc.text(`Tk ${Number(item.unit_price) * item.quantity}`, 450, currentY);
+          doc.text(
+            `Tk ${Number(item.unit_price) * item.quantity}`,
+            450,
+            currentY,
+          );
           currentY += 20;
         });
 
@@ -355,11 +400,19 @@ export class InvoicesService {
         doc.text('Discount:', 350, currentY);
         doc.text(`-Tk ${invoice.discount}`, 450, currentY);
         currentY += 15;
-        doc.fontSize(12).font('Helvetica-Bold').text('Total Amount:', 350, currentY);
+        doc
+          .fontSize(12)
+          .font('Helvetica-Bold')
+          .text('Total Amount:', 350, currentY);
         doc.text(`Tk ${invoice.total_amount}`, 450, currentY);
 
         doc.moveDown(4);
-        doc.fontSize(10).font('Helvetica').text('Thank you for shopping with Mohul Organic!', { align: 'center' });
+        doc
+          .fontSize(10)
+          .font('Helvetica')
+          .text('Thank you for shopping with Mohul Organic!', {
+            align: 'center',
+          });
       });
 
       doc.end();

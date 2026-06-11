@@ -1,4 +1,13 @@
-import { Controller, Post, Get, Body, Headers, Param, Query, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Headers,
+  Param,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CheckoutSummaryDto, PlaceOrderDto } from './dto/order.dto';
 
@@ -10,16 +19,21 @@ export class OrdersController {
   async checkoutSummary(
     @Headers('x-session-id') sessionId: string,
     @Headers('authorization') authHeader: string,
-    @Body() dto: CheckoutSummaryDto
+    @Body() dto: CheckoutSummaryDto,
   ) {
-    return this.ordersService.checkoutSummary(sessionId, authHeader, dto.zone, dto.coupon_code);
+    return this.ordersService.checkoutSummary(
+      sessionId,
+      authHeader,
+      dto.zone,
+      dto.coupon_code,
+    );
   }
 
   @Post('orders')
   async placeOrder(
     @Headers('x-session-id') sessionId: string,
     @Headers('authorization') authHeader: string,
-    @Body() dto: PlaceOrderDto
+    @Body() dto: PlaceOrderDto,
   ) {
     if (!dto.shipping_address) {
       throw new BadRequestException('Shipping address is required');

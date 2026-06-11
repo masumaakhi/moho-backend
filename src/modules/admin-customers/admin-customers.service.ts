@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import * as ExcelJS from 'exceljs';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
@@ -11,14 +15,14 @@ export class AdminCustomersService {
   ) {}
 
   async getCustomers(query: any) {
-    const { 
-      search, 
-      status, 
-      repeat_only, 
-      account_type, 
-      source_type, 
-      page = 1, 
-      limit = 10 
+    const {
+      search,
+      status,
+      repeat_only,
+      account_type,
+      source_type,
+      page = 1,
+      limit = 10,
     } = query;
 
     const skip = (page - 1) * limit;
@@ -62,7 +66,7 @@ export class AdminCustomersService {
               status: true,
               last_login_at: true,
               created_at: true,
-            }
+            },
           },
         },
         skip,
@@ -91,7 +95,7 @@ export class AdminCustomersService {
       include: {
         user: true,
         notes: {
-          orderBy: { created_at: 'desc' }
+          orderBy: { created_at: 'desc' },
         },
       },
     });
@@ -102,7 +106,7 @@ export class AdminCustomersService {
 
     // Get primary address
     const address = await this.prisma.customerAddress.findFirst({
-      where: { customer_id: id, is_default: true }
+      where: { customer_id: id, is_default: true },
     });
 
     return {
@@ -120,7 +124,7 @@ export class AdminCustomersService {
       orderBy: { created_at: 'desc' },
       include: {
         order_items: true,
-      }
+      },
     });
 
     return {
@@ -136,9 +140,9 @@ export class AdminCustomersService {
         user: {
           select: {
             phone: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     if (!customer) throw new NotFoundException('Customer not found');
@@ -150,19 +154,21 @@ export class AdminCustomersService {
     // 4. Duplicate order attempts
 
     const cancelledCount = await this.prisma.order.count({
-      where: { customer_id: id, order_status: 'cancelled' }
+      where: { customer_id: id, order_status: 'cancelled' },
     });
 
     const returnedCount = await this.prisma.order.count({
-      where: { customer_id: id, order_status: 'returned' }
+      where: { customer_id: id, order_status: 'returned' },
     });
 
-    const blacklistMatch = customer.user.phone ? await this.prisma.fraudBlacklistNumber.findUnique({
-      where: { phone: customer.user.phone }
-    }) : null;
+    const blacklistMatch = customer.user.phone
+      ? await this.prisma.fraudBlacklistNumber.findUnique({
+          where: { phone: customer.user.phone },
+        })
+      : null;
 
     const duplicateAttempts = await this.prisma.duplicateOrderMatch.count({
-      where: { OR: [{ new_order_id: id }, { old_order_id: id }] } // This logic depends on how you store order IDs in duplicates
+      where: { OR: [{ new_order_id: id }, { old_order_id: id }] }, // This logic depends on how you store order IDs in duplicates
     });
 
     // Mock risk score calculation
@@ -233,9 +239,9 @@ export class AdminCustomersService {
   }
 
   async toggleBlock(id: string, adminId: string) {
-    const customer = await this.prisma.customer.findUnique({ 
+    const customer = await this.prisma.customer.findUnique({
       where: { id },
-      include: { user: true }
+      include: { user: true },
     });
     if (!customer) throw new NotFoundException('Customer not found');
 
@@ -244,7 +250,10 @@ export class AdminCustomersService {
     await this.prisma.$transaction([
       this.prisma.customer.update({
         where: { id },
-        data: { is_blocked: isBlocking, status: isBlocking ? 'blocked' : 'active' },
+        data: {
+          is_blocked: isBlocking,
+          status: isBlocking ? 'blocked' : 'active',
+        },
       }),
       this.prisma.user.update({
         where: { id: customer.user_id },
@@ -261,29 +270,32 @@ export class AdminCustomersService {
 
     return {
       success: true,
-      message: isBlocking ? 'Customer blocked successfully' : 'Customer unblocked successfully',
+      message: isBlocking
+        ? 'Customer blocked successfully'
+        : 'Customer unblocked successfully',
     };
   }
 
   async bulkBlock(ids: string[], adminId: string) {
-    if (!ids || ids.length === 0) throw new BadRequestException('No customer IDs provided');
+    if (!ids || ids.length === 0)
+      throw new BadRequestException('No customer IDs provided');
 
     const customers = await this.prisma.customer.findMany({
       where: { id: { in: ids } },
-      select: { id: true, user_id: true }
+      select: { id: true, user_id: true },
     });
 
-    const userIds = customers.map(c => c.user_id).filter(Boolean);
+    const userIds = customers.map((c) => c.user_id).filter(Boolean);
 
     await this.prisma.$transaction([
       this.prisma.customer.updateMany({
         where: { id: { in: ids } },
-        data: { is_blocked: true, status: 'blocked' }
+        data: { is_blocked: true, status: 'blocked' },
       }),
       this.prisma.user.updateMany({
         where: { id: { in: userIds } },
-        data: { status: 'blocked' }
-      })
+        data: { status: 'blocked' },
+      }),
     ]);
 
     for (const customer of customers) {
@@ -322,7 +334,7 @@ export class AdminCustomersService {
       { header: 'Created At', key: 'created_at', width: 20 },
     ];
 
-    customers.forEach(c => {
+    customers.forEach((c) => {
       worksheet.addRow({
         id: c.id,
         name: c.name,
@@ -335,7 +347,10 @@ export class AdminCustomersService {
       });
     });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
     res.setHeader('Content-Disposition', 'attachment; filename=customers.xlsx');
 
     await workbook.xlsx.write(res);

@@ -5,4 +5,3 @@ export class ForgotPasswordDto {
   @IsNotEmpty()
   contact!: string; // phone or email
 }
-

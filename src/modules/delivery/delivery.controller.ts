@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { DeliveryService } from './delivery.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 import { Request } from 'express';
@@ -20,7 +29,10 @@ export class DeliveryController {
   @UseGuards(AdminAuthGuard)
   @Post('book')
   async bookCourier(@Req() req: AuthedReq, @Body() dto: { order_id: string }) {
-    const data = await this.deliveryService.bookCourier(req.user.sub, dto.order_id);
+    const data = await this.deliveryService.bookCourier(
+      req.user.sub,
+      dto.order_id,
+    );
     return successResponse('Courier booked successfully', data);
   }
 
@@ -43,10 +55,5 @@ export class DeliveryController {
   async retryBooking(@Req() req: AuthedReq, @Param('id') id: string) {
     const data = await this.deliveryService.retryBooking(req.user.sub, id);
     return successResponse('Booking retry successful', data);
-  }
-
-  @Post('pathao/webhook')
-  async handleWebhook(@Body() data: any) {
-    return this.deliveryService.handleWebhook(data);
   }
 }

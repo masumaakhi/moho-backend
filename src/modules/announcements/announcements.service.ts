@@ -50,7 +50,7 @@ export class AnnouncementsService {
 
   async create(adminId: string, data: any) {
     const announcement = await this.prisma.announcement.create({ data });
-    
+
     await this.activityLogs.create({
       actor_type: 'admin',
       user_id: adminId,
@@ -84,7 +84,9 @@ export class AnnouncementsService {
   }
 
   async remove(adminId: string, id: string) {
-    const announcement = await this.prisma.announcement.delete({ where: { id } });
+    const announcement = await this.prisma.announcement.delete({
+      where: { id },
+    });
 
     await this.activityLogs.create({
       actor_type: 'admin',

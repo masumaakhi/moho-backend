@@ -53,8 +53,11 @@ export class AutomationProcessor extends WorkerHost {
       const date = new Date();
       date.setDate(date.getDate() - 1); // Yesterday's report
       const dateStr = date.toISOString().split('T')[0];
-      
-      const report = await this.reportsService.getReportSummary(dateStr, dateStr);
+
+      const report = await this.reportsService.getReportSummary(
+        dateStr,
+        dateStr,
+      );
 
       // 2. Save to DailyReport table
       await this.prisma.dailyReport.upsert({
@@ -84,24 +87,36 @@ export class AutomationProcessor extends WorkerHost {
       });
 
       const superAdmins = await this.prisma.adminUser.findMany({
-        where: { 
-           role: { name: 'Super Admin' },
-           deleted_at: null 
+        where: {
+          role: { name: 'Super Admin' },
+          deleted_at: null,
         },
-        select: { email: true, name: true, id: true }
+        select: { email: true, name: true, id: true },
       });
 
       const notificationSettings = await this.prisma.setting.findFirst({
-        where: { key: 'admin_report_email' }
+        where: { key: 'admin_report_email' },
       });
       const primaryAdminEmail = notificationSettings?.value;
 
       // Combine and unique by email
       const allReceivers = [
-        ...(primaryAdminEmail ? [{ email: primaryAdminEmail, name: 'Primary Admin', id: null }] : []),
-        ...configuredReceivers.map(r => ({ email: r.email, name: r.name, id: null })),
-        ...superAdmins.map(a => ({ email: a.email as string, name: a.name, id: a.id }))
-      ].filter((v, i, a) => v.email && a.findIndex(t => t.email === v.email) === i);
+        ...(primaryAdminEmail
+          ? [{ email: primaryAdminEmail, name: 'Primary Admin', id: null }]
+          : []),
+        ...configuredReceivers.map((r) => ({
+          email: r.email,
+          name: r.name,
+          id: null,
+        })),
+        ...superAdmins.map((a) => ({
+          email: a.email,
+          name: a.name,
+          id: a.id,
+        })),
+      ].filter(
+        (v, i, a) => v.email && a.findIndex((t) => t.email === v.email) === i,
+      );
 
       if (allReceivers.length === 0) {
         await this.prisma.automationJob.update({
@@ -112,34 +127,40 @@ export class AutomationProcessor extends WorkerHost {
             error_log: 'No active report receivers or super admins found',
           },
         });
-        return { success: true, message: 'Report generated but no receivers found' };
+        return {
+          success: true,
+          message: 'Report generated but no receivers found',
+        };
       }
 
       for (const receiver of allReceivers) {
         try {
           const subject = `Daily Business Report - ${dateStr}`;
-          const text = `Hello ${receiver.name || 'Admin'},\n\nHere is the business summary for ${dateStr}:\n\n` +
-                       `Revenue: ৳${Number(report.data.summary.total_revenue).toLocaleString()}\n` +
-                       `Net Profit: ৳${Number(report.data.summary.net_profit).toLocaleString()}\n` +
-                       `Total Orders: ${report.data.summary.total_orders}\n` +
-                       `Delivered: ${report.data.summary.delivered_orders}\n\n` +
-                       `You can view full details in the Admin Dashboard under Intelligence > Reports.`;
+          const text =
+            `Hello ${receiver.name || 'Admin'},\n\nHere is the business summary for ${dateStr}:\n\n` +
+            `Revenue: ৳${Number(report.data.summary.total_revenue).toLocaleString()}\n` +
+            `Net Profit: ৳${Number(report.data.summary.net_profit).toLocaleString()}\n` +
+            `Total Orders: ${report.data.summary.total_orders}\n` +
+            `Delivered: ${report.data.summary.delivered_orders}\n\n` +
+            `You can view full details in the Admin Dashboard under Intelligence > Reports.`;
 
           await this.sendEmail(receiver.email, subject, text);
 
           // 4. Create In-App Notification for Admin
           if (receiver.id) {
-             await this.prisma.notification.create({
-                data: {
-                   user_id: receiver.id,
-                   type: 'system-alert',
-                   title: 'Daily Report Sent',
-                   message: `The business report for ${dateStr} has been sent to your email (${receiver.email}).`
-                }
-             });
+            await this.prisma.notification.create({
+              data: {
+                user_id: receiver.id,
+                type: 'system-alert',
+                title: 'Daily Report Sent',
+                message: `The business report for ${dateStr} has been sent to your email (${receiver.email}).`,
+              },
+            });
           }
         } catch (emailError) {
-          this.logger.error(`Failed to send report to ${receiver.email}: ${emailError.message}`);
+          this.logger.error(
+            `Failed to send report to ${receiver.email}: ${emailError.message}`,
+          );
           await this.prisma.emailLog.create({
             data: {
               to: receiver.email,
@@ -156,10 +177,12 @@ export class AutomationProcessor extends WorkerHost {
         data: {
           status: 'success',
           finished_at: new Date(),
-          result: { report_date: dateStr, receivers_count: allReceivers.length },
+          result: {
+            report_date: dateStr,
+            receivers_count: allReceivers.length,
+          },
         },
       });
-
     } catch (error) {
       this.logger.error(`Daily report job failed: ${error.message}`);
       await this.prisma.automationJob.update({
@@ -176,12 +199,16 @@ export class AutomationProcessor extends WorkerHost {
 
   private async handleEmailRetryJob(job: Job) {
     const { emailLogId, to, subject } = job.data;
-    
+
     try {
       // Logic to resend the actual content would need to store the content in EmailLog
       // For now, we'll simulate a retry
-      await this.sendEmail(to, `[RETRY] ${subject}`, 'This is a retry of a previously failed email.');
-      
+      await this.sendEmail(
+        to,
+        `[RETRY] ${subject}`,
+        'This is a retry of a previously failed email.',
+      );
+
       await this.prisma.emailLog.update({
         where: { id: emailLogId },
         data: { status: 'sent', last_retry: new Date() },
@@ -189,11 +216,11 @@ export class AutomationProcessor extends WorkerHost {
     } catch (error) {
       await this.prisma.emailLog.update({
         where: { id: emailLogId },
-        data: { 
-          status: 'failed', 
-          error: error.message, 
+        data: {
+          status: 'failed',
+          error: error.message,
           retry_count: { increment: 1 },
-          last_retry: new Date()
+          last_retry: new Date(),
         },
       });
       throw error;

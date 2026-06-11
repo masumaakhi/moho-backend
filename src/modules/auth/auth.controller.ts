@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -14,7 +23,9 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CustomerAuthGuard } from './guards/customer-auth.guard';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
 
-type AuthedReq = Request & { user?: { sub: string; scope: 'customer' | 'admin' } };
+type AuthedReq = Request & {
+  user?: { sub: string; scope: 'customer' | 'admin' };
+};
 
 @Controller('auth')
 export class AuthController {
@@ -51,7 +62,7 @@ export class AuthController {
   }
 
   @Post('set-guest-password')
-  setGuestPassword(@Body() dto: { userId: string, password: string }) {
+  setGuestPassword(@Body() dto: { userId: string; password: string }) {
     return this.auth.setGuestPassword(dto.userId, dto.password);
   }
 
@@ -107,4 +118,3 @@ export class AuthController {
     return this.auth.logout(req.user!.sub, 'admin');
   }
 }
-

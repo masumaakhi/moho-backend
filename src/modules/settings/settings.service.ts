@@ -1,14 +1,18 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { encrypt, decrypt, maskValue } from '../../common/utils/crypto.util';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
-import { 
-  UpdateGeneralSettingsDto, 
-  UpdateDeliverySettingsDto, 
-  UpdateEmailSettingsDto, 
+import {
+  UpdateGeneralSettingsDto,
+  UpdateDeliverySettingsDto,
+  UpdateEmailSettingsDto,
   UpdateNotificationSettingsDto,
-  UpdateReportReceiverDto
+  UpdateReportReceiverDto,
 } from './dto/settings.dto';
 
 @Injectable()
@@ -20,7 +24,9 @@ export class SettingsService {
     private configService: ConfigService,
     private activityLogs: ActivityLogsService,
   ) {
-    this.encryptionKey = this.configService.get<string>('SETTINGS_ENCRYPTION_KEY') || 'default_secret_key';
+    this.encryptionKey =
+      this.configService.get<string>('SETTINGS_ENCRYPTION_KEY') ||
+      'default_secret_key';
   }
 
   async getAllSettings() {
@@ -32,14 +38,21 @@ export class SettingsService {
       delivery: {},
       email: {},
       notification: {},
-      receivers: receivers
+      receivers: receivers,
     };
 
-    settings.forEach(s => {
+    settings.forEach((s) => {
       let value = s.value;
-      
+
       // Mask sensitive values
-      if (['pathao_api_key', 'pathao_secret', 'pathao_password', 'smtp_pass'].includes(s.key)) {
+      if (
+        [
+          'pathao_api_key',
+          'pathao_secret',
+          'pathao_password',
+          'smtp_pass',
+        ].includes(s.key)
+      ) {
         value = maskValue(decrypt(value, this.encryptionKey));
       }
 
@@ -52,7 +65,12 @@ export class SettingsService {
     return groupedSettings;
   }
 
-  async updateSettings(group: string, data: any, adminUserId: string, isSuperAdminCheck?: boolean) {
+  async updateSettings(
+    group: string,
+    data: any,
+    adminUserId: string,
+    isSuperAdminCheck?: boolean,
+  ) {
     // Fetch admin user to check role
     const admin = await this.prisma.adminUser.findUnique({
       where: { id: adminUserId },
@@ -63,11 +81,18 @@ export class SettingsService {
 
     // Check Super Admin for sensitive groups
     if (['delivery', 'email'].includes(group) && !isSuperAdmin) {
-      throw new ForbiddenException('Only Super Admin can update sensitive settings');
+      throw new ForbiddenException(
+        'Only Super Admin can update sensitive settings',
+      );
     }
 
     const updates: any[] = [];
-    const sensitiveKeys = ['pathao_api_key', 'pathao_secret', 'pathao_password', 'smtp_pass'];
+    const sensitiveKeys = [
+      'pathao_api_key',
+      'pathao_secret',
+      'pathao_password',
+      'smtp_pass',
+    ];
 
     for (const [key, value] of Object.entries(data)) {
       if (value === undefined || value === null) continue;
@@ -84,7 +109,7 @@ export class SettingsService {
           where: { key },
           update: { value: finalValue, group },
           create: { key, value: finalValue, group },
-        })
+        }),
       );
     }
 
@@ -100,21 +125,24 @@ export class SettingsService {
     return { message: `${group} settings updated successfully` };
   }
 
-  async updateReportReceivers(receivers: UpdateReportReceiverDto[], adminUserId: string) {
+  async updateReportReceivers(
+    receivers: UpdateReportReceiverDto[],
+    adminUserId: string,
+  ) {
     // For simplicity, we'll replace the existing receivers or update them
     // Here we'll just handle one by one or a batch
     for (const receiver of receivers) {
       await this.prisma.reportReceiver.upsert({
         where: { email: receiver.email },
-        update: { 
+        update: {
           name: receiver.name,
-          is_active: receiver.is_active 
+          is_active: receiver.is_active,
         },
         create: {
           name: receiver.name,
           email: receiver.email,
-          is_active: receiver.is_active ?? true
-        }
+          is_active: receiver.is_active ?? true,
+        },
       });
     }
 

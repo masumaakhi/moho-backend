@@ -1,7 +1,15 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import * as bcrypt from 'bcrypt';
-import { CreateAdminDto, UpdateAdminDto, UpdateAdminStatusDto } from './dto/admin-user.dto';
+import {
+  CreateAdminDto,
+  UpdateAdminDto,
+  UpdateAdminStatusDto,
+} from './dto/admin-user.dto';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 
 @Injectable()
@@ -13,7 +21,7 @@ export class AdminUsersService {
 
   async findAll(query: any) {
     const { search, role_id, status } = query;
-    
+
     return this.prisma.adminUser.findMany({
       where: {
         deleted_at: null,
@@ -38,7 +46,8 @@ export class AdminUsersService {
       where: { id },
       include: { role: true },
     });
-    if (!admin || admin.deleted_at) throw new NotFoundException('Admin not found');
+    if (!admin || admin.deleted_at)
+      throw new NotFoundException('Admin not found');
     return admin;
   }
 
@@ -97,7 +106,11 @@ export class AdminUsersService {
     return updated;
   }
 
-  async updateStatus(id: string, adminUserId: string, dto: UpdateAdminStatusDto) {
+  async updateStatus(
+    id: string,
+    adminUserId: string,
+    dto: UpdateAdminStatusDto,
+  ) {
     await this.findOne(id);
 
     const updated = await this.prisma.adminUser.update({

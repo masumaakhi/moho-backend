@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  IsEmail,
+  IsObject,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateGeneralSettingsDto {
   @IsString()
@@ -49,14 +57,17 @@ export class UpdateDeliverySettingsDto {
 
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   delivery_charge_default?: number;
 
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   delivery_charge_inside?: number;
 
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   delivery_charge_outside?: number;
 }
 
@@ -67,6 +78,7 @@ export class UpdateEmailSettingsDto {
 
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   smtp_port?: number;
 
   @IsString()
@@ -85,6 +97,7 @@ export class UpdateEmailSettingsDto {
 export class UpdateNotificationSettingsDto {
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   inventory_alert_threshold?: number;
 
   @IsBoolean()

@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { successResponse } from '../../common/responses/api-response';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
@@ -9,7 +14,7 @@ export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getProfile(userId: string) {
-    let user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { customer: true },
     });
@@ -23,8 +28,8 @@ export class CustomersService {
           name: user.name || 'Unnamed',
           email: user.email,
           phone: user.phone,
-          source_type: 'auto_recovery'
-        }
+          source_type: 'auto_recovery',
+        },
       });
     }
 
@@ -35,16 +40,18 @@ export class CustomersService {
       phone: user.phone,
       account_type: user.account_type,
       is_password_set: user.is_password_set,
-      customer: customer ? {
-        id: customer.id,
-        source_type: customer.source_type,
-        account_completed_at: customer.account_completed_at,
-        first_order_id: customer.first_order_id,
-        address: customer.address,
-        mohul_cash: customer.mohul_cash,
-        total_orders: customer.total_orders,
-        total_spend: customer.total_spend,
-      } : null,
+      customer: customer
+        ? {
+            id: customer.id,
+            source_type: customer.source_type,
+            account_completed_at: customer.account_completed_at,
+            first_order_id: customer.first_order_id,
+            address: customer.address,
+            mohul_cash: customer.mohul_cash,
+            total_orders: customer.total_orders,
+            total_spend: customer.total_spend,
+          }
+        : null,
     });
   }
 
@@ -54,7 +61,11 @@ export class CustomersService {
     // Check duplicate phone/email
     if (userData.email) {
       const existingEmail = await this.prisma.user.findFirst({
-        where: { email: userData.email.toLowerCase(), id: { not: userId }, deleted_at: null },
+        where: {
+          email: userData.email.toLowerCase(),
+          id: { not: userId },
+          deleted_at: null,
+        },
       });
       if (existingEmail) throw new BadRequestException('Email already in use');
     }
@@ -63,7 +74,8 @@ export class CustomersService {
       const existingPhone = await this.prisma.user.findFirst({
         where: { phone: userData.phone, id: { not: userId }, deleted_at: null },
       });
-      if (existingPhone) throw new BadRequestException('Phone number already in use');
+      if (existingPhone)
+        throw new BadRequestException('Phone number already in use');
     }
 
     const updatedUser = await this.prisma.$transaction(async (tx) => {
@@ -110,7 +122,10 @@ export class CustomersService {
     return successResponse('Addresses fetched successfully', addresses);
   }
 
-  async addAddress(userId: string, dto: { address: string; is_default?: boolean }) {
+  async addAddress(
+    userId: string,
+    dto: { address: string; is_default?: boolean },
+  ) {
     const customer = await this.getCustomerByUserId(userId);
 
     if (dto.is_default) {
@@ -131,9 +146,15 @@ export class CustomersService {
     return successResponse('Address added successfully', address);
   }
 
-  async updateAddress(userId: string, addressId: string, dto: { address?: string; is_default?: boolean }) {
+  async updateAddress(
+    userId: string,
+    addressId: string,
+    dto: { address?: string; is_default?: boolean },
+  ) {
     const customer = await this.getCustomerByUserId(userId);
-    const address = await this.prisma.customerAddress.findUnique({ where: { id: addressId } });
+    const address = await this.prisma.customerAddress.findUnique({
+      where: { id: addressId },
+    });
 
     if (!address || address.customer_id !== customer.id) {
       throw new NotFoundException('Address not found');
@@ -156,7 +177,9 @@ export class CustomersService {
 
   async deleteAddress(userId: string, addressId: string) {
     const customer = await this.getCustomerByUserId(userId);
-    const address = await this.prisma.customerAddress.findUnique({ where: { id: addressId } });
+    const address = await this.prisma.customerAddress.findUnique({
+      where: { id: addressId },
+    });
 
     if (!address || address.customer_id !== customer.id) {
       throw new NotFoundException('Address not found');
@@ -167,13 +190,17 @@ export class CustomersService {
   }
 
   async getOrders(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { customer: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { customer: true },
+    });
     if (!user) throw new NotFoundException('User not found');
 
     // Guest linking: Find orders with same phone/email but no customer_id
     const conditions: any[] = [];
     if (user.phone) conditions.push({ customer_phone: user.phone });
-    if (user.email) conditions.push({ customer_email: user.email.toLowerCase() });
+    if (user.email)
+      conditions.push({ customer_email: user.email.toLowerCase() });
 
     if (conditions.length > 0) {
       const unlinkedOrders = await this.prisma.order.findMany({
@@ -185,7 +212,7 @@ export class CustomersService {
 
       if (unlinkedOrders.length > 0 && user.customer) {
         await this.prisma.order.updateMany({
-          where: { id: { in: unlinkedOrders.map(o => o.id) } },
+          where: { id: { in: unlinkedOrders.map((o) => o.id) } },
           data: { customer_id: user.customer.id, user_id: user.id },
         });
 
@@ -194,18 +221,18 @@ export class CustomersService {
           where: {
             customer_id: user.customer.id,
             deleted_at: null,
-            order_status: { notIn: ['cancelled', 'returned'] }
+            order_status: { notIn: ['cancelled', 'returned'] },
           },
           _count: { id: true },
-          _sum: { total_amount: true }
+          _sum: { total_amount: true },
         });
 
         await this.prisma.customer.update({
           where: { id: user.customer.id },
           data: {
             total_orders: stats._count.id || 0,
-            total_spend: stats._sum.total_amount || 0
-          }
+            total_spend: stats._sum.total_amount || 0,
+          },
         });
       }
     }
@@ -228,9 +255,9 @@ export class CustomersService {
         order_items: {
           include: {
             product: {
-              include: { images: { take: 1 } }
-            }
-          }
+              include: { images: { take: 1 } },
+            },
+          },
         },
         status_history: true,
       },
@@ -270,7 +297,11 @@ export class CustomersService {
         where: { id: item.product_id },
       });
 
-      if (product && product.status === 'active' && product.stock_quantity >= item.quantity) {
+      if (
+        product &&
+        product.status === 'active' &&
+        product.stock_quantity >= item.quantity
+      ) {
         await this.prisma.cartItem.create({
           data: {
             cart_id: cart.id,
@@ -297,7 +328,9 @@ export class CustomersService {
     });
 
     if (addedItems.length === 0) {
-      throw new BadRequestException('None of the products are available for reorder');
+      throw new BadRequestException(
+        'None of the products are available for reorder',
+      );
     }
 
     return successResponse('Products added to cart', {
@@ -307,9 +340,13 @@ export class CustomersService {
   }
 
   async setPassword(userId: string, new_password: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { customer: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { customer: true },
+    });
     if (!user) throw new NotFoundException('User not found');
-    if (user.is_password_set) throw new BadRequestException('Password already set');
+    if (user.is_password_set)
+      throw new BadRequestException('Password already set');
 
     const password_hash = await bcrypt.hash(new_password, 10);
     await this.prisma.user.update({
@@ -337,7 +374,9 @@ export class CustomersService {
   }
 
   private async getCustomerByUserId(userId: string) {
-    let customer = await this.prisma.customer.findFirst({ where: { user_id: userId } });
+    let customer = await this.prisma.customer.findFirst({
+      where: { user_id: userId },
+    });
     if (!customer) {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       if (!user) throw new NotFoundException('User not found');
@@ -347,8 +386,8 @@ export class CustomersService {
           name: user.name || 'Unnamed',
           email: user.email,
           phone: user.phone,
-          source_type: 'auto_recovery'
-        }
+          source_type: 'auto_recovery',
+        },
       });
     }
     return customer;

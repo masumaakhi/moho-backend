@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { BannersService } from './banners.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 import { successResponse } from '../../common/responses/api-response';
@@ -9,7 +20,10 @@ export class BannersController {
 
   @Get('public')
   async findPublic(@Query() query: any) {
-    const data = await this.bannersService.findAll({ ...query, status: 'active' });
+    const data = await this.bannersService.findAll({
+      ...query,
+      status: 'active',
+    });
     return successResponse('Banners fetched successfully', data);
   }
 }

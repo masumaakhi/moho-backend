@@ -9,4 +9,3 @@ export class SetPasswordDto {
   @MinLength(6)
   new_password!: string;
 }
-

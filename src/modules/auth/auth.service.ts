@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -36,17 +41,35 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  private async signAccessToken(payload: { sub: string; scope: 'customer' | 'admin' }) {
-    const key = payload.scope === 'admin' ? 'ADMIN_JWT_ACCESS_EXPIRES_IN' : 'JWT_ACCESS_EXPIRES_IN';
-    const expiresIn = this.config.get<string>(key) || (payload.scope === 'admin' ? '30d' : '15m');
-    const secret = this.config.get<string>('JWT_ACCESS_SECRET') ?? 'access_secret';
+  private async signAccessToken(payload: {
+    sub: string;
+    scope: 'customer' | 'admin';
+  }) {
+    const key =
+      payload.scope === 'admin'
+        ? 'ADMIN_JWT_ACCESS_EXPIRES_IN'
+        : 'JWT_ACCESS_EXPIRES_IN';
+    const expiresIn =
+      this.config.get<string>(key) ||
+      (payload.scope === 'admin' ? '30d' : '15m');
+    const secret =
+      this.config.get<string>('JWT_ACCESS_SECRET') ?? 'access_secret';
     return this.jwt.signAsync(payload, { secret, expiresIn: expiresIn as any });
   }
 
-  private async signRefreshToken(payload: { sub: string; scope: 'customer' | 'admin' }) {
-    const key = payload.scope === 'admin' ? 'ADMIN_JWT_REFRESH_EXPIRES_IN' : 'JWT_REFRESH_EXPIRES_IN';
-    const expiresIn = this.config.get<string>(key) || (payload.scope === 'admin' ? '365d' : '7d');
-    const secret = this.config.get<string>('JWT_REFRESH_SECRET') ?? 'refresh_secret';
+  private async signRefreshToken(payload: {
+    sub: string;
+    scope: 'customer' | 'admin';
+  }) {
+    const key =
+      payload.scope === 'admin'
+        ? 'ADMIN_JWT_REFRESH_EXPIRES_IN'
+        : 'JWT_REFRESH_EXPIRES_IN';
+    const expiresIn =
+      this.config.get<string>(key) ||
+      (payload.scope === 'admin' ? '365d' : '7d');
+    const secret =
+      this.config.get<string>('JWT_REFRESH_SECRET') ?? 'refresh_secret';
     return this.jwt.signAsync(payload, { secret, expiresIn: expiresIn as any });
   }
 
@@ -56,8 +79,12 @@ export class AuthService {
     userId?: string;
     adminUserId?: string;
   }) {
-    const key = args.scope === 'admin' ? 'ADMIN_JWT_REFRESH_EXPIRES_IN' : 'JWT_REFRESH_EXPIRES_IN';
-    const expiresIn = this.config.get<string>(key) || (args.scope === 'admin' ? '365d' : '7d');
+    const key =
+      args.scope === 'admin'
+        ? 'ADMIN_JWT_REFRESH_EXPIRES_IN'
+        : 'JWT_REFRESH_EXPIRES_IN';
+    const expiresIn =
+      this.config.get<string>(key) || (args.scope === 'admin' ? '365d' : '7d');
     const expiresAt = this.parseExpiresToDate(expiresIn);
     const tokenHash = await bcrypt.hash(args.rawToken, 10);
 
@@ -99,7 +126,8 @@ export class AuthService {
 
     if (!user) throw new UnauthorizedException('Account not found');
 
-    if (user.status !== 'active') throw new ForbiddenException('Account blocked/inactive');
+    if (user.status !== 'active')
+      throw new ForbiddenException('Account blocked/inactive');
 
     if (!user.is_password_set || !user.password_hash) {
       throw new ForbiddenException('Password not set');
@@ -113,9 +141,19 @@ export class AuthService {
       data: { last_login_at: new Date() },
     });
 
-    const access_token = await this.signAccessToken({ sub: user.id, scope: 'customer' });
-    const refresh_token = await this.signRefreshToken({ sub: user.id, scope: 'customer' });
-    await this.saveRefreshToken({ rawToken: refresh_token, scope: 'customer', userId: user.id });
+    const access_token = await this.signAccessToken({
+      sub: user.id,
+      scope: 'customer',
+    });
+    const refresh_token = await this.signRefreshToken({
+      sub: user.id,
+      scope: 'customer',
+    });
+    await this.saveRefreshToken({
+      rawToken: refresh_token,
+      scope: 'customer',
+      userId: user.id,
+    });
 
     return successResponse('Login successful', {
       access_token,
@@ -133,18 +171,22 @@ export class AuthService {
 
   async signup(dto: SignupDto) {
     const contact = dto.contact.trim();
-    const email = isEmail(contact) ? contact.toLowerCase() : dto.email?.toLowerCase();
-    const phone = !isEmail(contact) ? normalizePhone(contact) : dto.phone ? normalizePhone(dto.phone) : undefined;
+    const email = isEmail(contact)
+      ? contact.toLowerCase()
+      : dto.email?.toLowerCase();
+    const phone = !isEmail(contact)
+      ? normalizePhone(contact)
+      : dto.phone
+        ? normalizePhone(dto.phone)
+        : undefined;
 
-    if (!email && !phone) throw new BadRequestException('Phone or email required');
+    if (!email && !phone)
+      throw new BadRequestException('Phone or email required');
 
     const existing = await this.prisma.user.findFirst({
       where: {
         deleted_at: null,
-        OR: [
-          ...(email ? [{ email }] : []),
-          ...(phone ? [{ phone }] : []),
-        ],
+        OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
       },
     });
     if (existing) throw new BadRequestException('Already registered');
@@ -173,9 +215,19 @@ export class AuthService {
       },
     });
 
-    const access_token = await this.signAccessToken({ sub: user.id, scope: 'customer' });
-    const refresh_token = await this.signRefreshToken({ sub: user.id, scope: 'customer' });
-    await this.saveRefreshToken({ rawToken: refresh_token, scope: 'customer', userId: user.id });
+    const access_token = await this.signAccessToken({
+      sub: user.id,
+      scope: 'customer',
+    });
+    const refresh_token = await this.signRefreshToken({
+      sub: user.id,
+      scope: 'customer',
+    });
+    await this.saveRefreshToken({
+      rawToken: refresh_token,
+      scope: 'customer',
+      userId: user.id,
+    });
 
     return successResponse('Signup successful', {
       access_token,
@@ -193,7 +245,7 @@ export class AuthService {
 
   async googleLogin(token: string) {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
-    
+
     let payload: any;
     try {
       // Try verifying as ID Token first (default)
@@ -207,15 +259,19 @@ export class AuthService {
     } catch (e) {
       // If it fails, treat as Access Token and fetch from Google UserInfo API
       try {
-        const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
-        if (!response.ok) throw new Error('Failed to fetch user info from Google');
+        const response = await fetch(
+          `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`,
+        );
+        if (!response.ok)
+          throw new Error('Failed to fetch user info from Google');
         payload = await response.json();
       } catch (err) {
         throw new UnauthorizedException('Invalid Google token');
       }
     }
 
-    if (!payload || !payload.email) throw new UnauthorizedException('Invalid Google token');
+    if (!payload || !payload.email)
+      throw new UnauthorizedException('Invalid Google token');
 
     const email = payload.email.toLowerCase();
     let user = await this.prisma.user.findUnique({
@@ -251,9 +307,19 @@ export class AuthService {
       });
     }
 
-    const access_token = await this.signAccessToken({ sub: user.id, scope: 'customer' });
-    const refresh_token = await this.signRefreshToken({ sub: user.id, scope: 'customer' });
-    await this.saveRefreshToken({ rawToken: refresh_token, scope: 'customer', userId: user.id });
+    const access_token = await this.signAccessToken({
+      sub: user.id,
+      scope: 'customer',
+    });
+    const refresh_token = await this.signRefreshToken({
+      sub: user.id,
+      scope: 'customer',
+    });
+    await this.saveRefreshToken({
+      rawToken: refresh_token,
+      scope: 'customer',
+      userId: user.id,
+    });
 
     return successResponse('Google login successful', {
       access_token,
@@ -279,7 +345,8 @@ export class AuthService {
       },
     });
     if (!admin) throw new UnauthorizedException('Admin not found');
-    if (admin.status !== 'active') throw new ForbiddenException('Admin disabled');
+    if (admin.status !== 'active')
+      throw new ForbiddenException('Admin disabled');
 
     const ok = await bcrypt.compare(dto.password, admin.password_hash);
     if (!ok) throw new UnauthorizedException('Wrong password');
@@ -289,9 +356,19 @@ export class AuthService {
       data: { last_login_at: new Date() },
     });
 
-    const access_token = await this.signAccessToken({ sub: admin.id, scope: 'admin' });
-    const refresh_token = await this.signRefreshToken({ sub: admin.id, scope: 'admin' });
-    await this.saveRefreshToken({ rawToken: refresh_token, scope: 'admin', adminUserId: admin.id });
+    const access_token = await this.signAccessToken({
+      sub: admin.id,
+      scope: 'admin',
+    });
+    const refresh_token = await this.signRefreshToken({
+      sub: admin.id,
+      scope: 'admin',
+    });
+    await this.saveRefreshToken({
+      rawToken: refresh_token,
+      scope: 'admin',
+      adminUserId: admin.id,
+    });
 
     const permissions =
       admin.role?.role_permissions?.map((rp) => rp.permission.code) ?? [];
@@ -314,16 +391,20 @@ export class AuthService {
       const admin = await this.prisma.adminUser.findUnique({
         where: { id: userId },
         include: {
-          role: { include: { role_permissions: { include: { permission: true } } } },
+          role: {
+            include: { role_permissions: { include: { permission: true } } },
+          },
         },
       });
-      if (!admin || admin.deleted_at) throw new UnauthorizedException('Unauthorized');
+      if (!admin || admin.deleted_at)
+        throw new UnauthorizedException('Unauthorized');
       return successResponse('OK', {
         id: admin.id,
         name: admin.name,
         email: admin.email,
         role: admin.role?.name ?? null,
-        permissions: admin.role?.role_permissions?.map((rp) => rp.permission.code) ?? [],
+        permissions:
+          admin.role?.role_permissions?.map((rp) => rp.permission.code) ?? [],
       });
     }
 
@@ -331,10 +412,11 @@ export class AuthService {
       where: { id: userId },
       include: { customer: true },
     });
-    if (!user || user.deleted_at) throw new UnauthorizedException('Unauthorized');
+    if (!user || user.deleted_at)
+      throw new UnauthorizedException('Unauthorized');
     const pendingOrders = await this.prisma.order.aggregate({
       where: { user_id: userId, order_status: 'pending' },
-      _sum: { total_amount: true }
+      _sum: { total_amount: true },
     });
 
     return successResponse('OK', {
@@ -345,13 +427,14 @@ export class AuthService {
       account_type: user.account_type,
       is_password_set: user.is_password_set,
       customer: user.customer,
-      pending_amount: Number(pendingOrders._sum.total_amount || 0)
+      pending_amount: Number(pendingOrders._sum.total_amount || 0),
     });
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || user.deleted_at) throw new UnauthorizedException('Unauthorized');
+    if (!user || user.deleted_at)
+      throw new UnauthorizedException('Unauthorized');
     if (!user.password_hash) throw new BadRequestException('Password not set');
 
     const ok = await bcrypt.compare(dto.current_password, user.password_hash);
@@ -434,7 +517,8 @@ export class AuthService {
     });
     if (!user) throw new BadRequestException('Account not found');
 
-    const rawToken = globalThis.crypto?.randomUUID?.() ?? require('crypto').randomUUID();
+    const rawToken =
+      globalThis.crypto?.randomUUID?.() ?? require('crypto').randomUUID();
     const tokenHash = await bcrypt.hash(sha256Like(rawToken), 10);
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
@@ -446,7 +530,8 @@ export class AuthService {
     return successResponse('Reset token generated', {
       token: rawToken,
       expires_at: expiresAt.toISOString(),
-      is_guest_auto: user.account_type === 'guest_auto' && !user.is_password_set,
+      is_guest_auto:
+        user.account_type === 'guest_auto' && !user.is_password_set,
     });
   }
 
@@ -467,7 +552,10 @@ export class AuthService {
   async setPassword(dto: SetPasswordDto) {
     // same as reset-password, but intended for guest_auto completion flow
     const record = await this.findValidPasswordReset(dto.token);
-    const user = await this.prisma.user.findUnique({ where: { id: record.user_id }, include: { customer: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: record.user_id },
+      include: { customer: true },
+    });
     if (!user) throw new BadRequestException('Account not found');
 
     const password_hash = await bcrypt.hash(dto.new_password, 10);
@@ -490,10 +578,15 @@ export class AuthService {
   }
 
   async setGuestPassword(userId: string, new_password: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { customer: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { customer: true },
+    });
     if (!user) throw new BadRequestException('Account not found');
-    if (user.is_password_set) throw new BadRequestException('Password is already set for this account');
-    if (user.account_type !== 'guest_auto') throw new BadRequestException('Not a guest auto-created account');
+    if (user.is_password_set)
+      throw new BadRequestException('Password is already set for this account');
+    if (user.account_type !== 'guest_auto')
+      throw new BadRequestException('Not a guest auto-created account');
 
     const password_hash = await bcrypt.hash(new_password, 10);
     await this.prisma.user.update({
@@ -508,9 +601,19 @@ export class AuthService {
       });
     }
 
-    const access_token = await this.signAccessToken({ sub: user.id, scope: 'customer' });
-    const refresh_token = await this.signRefreshToken({ sub: user.id, scope: 'customer' });
-    await this.saveRefreshToken({ rawToken: refresh_token, scope: 'customer', userId: user.id });
+    const access_token = await this.signAccessToken({
+      sub: user.id,
+      scope: 'customer',
+    });
+    const refresh_token = await this.signRefreshToken({
+      sub: user.id,
+      scope: 'customer',
+    });
+    await this.saveRefreshToken({
+      rawToken: refresh_token,
+      scope: 'customer',
+      userId: user.id,
+    });
 
     return successResponse('Password set successfully', {
       access_token,
@@ -526,7 +629,6 @@ export class AuthService {
     });
   }
 
-
   async updateProfile(userId: string, dto: UpdateProfileDto) {
     const { address, ...userData } = dto;
 
@@ -540,7 +642,9 @@ export class AuthService {
 
       if (address !== undefined) {
         // Find customer and update
-        const customer = await tx.customer.findFirst({ where: { user_id: userId } });
+        const customer = await tx.customer.findFirst({
+          where: { user_id: userId },
+        });
         if (customer) {
           await tx.customer.update({
             where: { id: customer.id },
@@ -568,4 +672,3 @@ export class AuthService {
     throw new BadRequestException('Invalid or expired token');
   }
 }
-

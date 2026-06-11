@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Res, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Res,
+  Req,
+} from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 import type { Response } from 'express';
@@ -20,7 +30,11 @@ export class InvoicesController {
   }
 
   @Get('bulk-pdf')
-  async exportBulkPdf(@Query('orderIds') orderIdsString: string, @Res() res: Response, @Req() req: any) {
+  async exportBulkPdf(
+    @Query('orderIds') orderIdsString: string,
+    @Res() res: Response,
+    @Req() req: any,
+  ) {
     const adminId = req.user.sub;
     const orderIds = orderIdsString ? orderIdsString.split(',') : [];
     return this.invoicesService.exportBulkPdf(orderIds, res, adminId);
@@ -32,7 +46,11 @@ export class InvoicesController {
   }
 
   @Get(':id/pdf')
-  async exportPdf(@Param('id') id: string, @Res() res: Response, @Req() req: any) {
+  async exportPdf(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @Req() req: any,
+  ) {
     const adminId = req.user.sub;
     return this.invoicesService.exportPdf(id, res, adminId);
   }

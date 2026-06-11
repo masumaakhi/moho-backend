@@ -1,6 +1,22 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { AdminProductsService } from './admin-products.service';
-import { CreateProductDto, UpdateProductDto, CreateCategoryDto } from './dto/admin-product.dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  CreateCategoryDto,
+} from './dto/admin-product.dto';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 
 @Controller('admin')
@@ -43,7 +59,11 @@ export class AdminProductsController {
   }
 
   @Patch('products/:id')
-  updateProduct(@Param('id') id: string, @Body() dto: UpdateProductDto, @Req() req: any) {
+  updateProduct(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductDto,
+    @Req() req: any,
+  ) {
     const adminUserId = req?.user?.id || '00000000-0000-0000-0000-000000000000';
     return this.productsService.updateProduct(id, adminUserId, dto);
   }

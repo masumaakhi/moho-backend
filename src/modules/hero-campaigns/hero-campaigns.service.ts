@@ -52,7 +52,7 @@ export class HeroCampaignsService {
 
   async create(adminId: string, data: any) {
     const campaign = await this.prisma.heroCampaign.create({ data });
-    
+
     await this.cacheService.del('campaigns:public:active');
 
     await this.activityLogs.create({

@@ -23,12 +23,20 @@ export class AnalyticsService {
     });
 
     const todayRevenue = await this.prisma.order.aggregate({
-      where: { created_at: { gte: today }, order_status: { not: 'cancelled' }, deleted_at: null },
+      where: {
+        created_at: { gte: today },
+        order_status: { not: 'cancelled' },
+        deleted_at: null,
+      },
       _sum: { total_amount: true },
     });
 
     const yesterdayRevenue = await this.prisma.order.aggregate({
-      where: { created_at: { gte: yesterday, lt: today }, order_status: { not: 'cancelled' }, deleted_at: null },
+      where: {
+        created_at: { gte: yesterday, lt: today },
+        order_status: { not: 'cancelled' },
+        deleted_at: null,
+      },
       _sum: { total_amount: true },
     });
 
@@ -42,14 +50,17 @@ export class AnalyticsService {
     });
 
     const returnedCount = await this.prisma.order.count({
-      where: { order_status: { in: ['cancelled', 'returned'] }, deleted_at: null },
+      where: {
+        order_status: { in: ['cancelled', 'returned'] },
+        deleted_at: null,
+      },
     });
 
     // Calculate changes
     const ordersChange = this.calculateChange(todayOrders, yesterdayOrders);
     const revenueChange = this.calculateChange(
       Number(todayRevenue._sum.total_amount || 0),
-      Number(yesterdayRevenue._sum.total_amount || 0)
+      Number(yesterdayRevenue._sum.total_amount || 0),
     );
 
     return successResponse('Dashboard summary fetched', {
@@ -98,7 +109,10 @@ export class AnalyticsService {
 
     const chartData = this.groupByDay(orders, days, 'revenue');
 
-    return successResponse(`Revenue analytics for last ${days} days`, chartData);
+    return successResponse(
+      `Revenue analytics for last ${days} days`,
+      chartData,
+    );
   }
 
   async getBestSellingProducts(limit: number) {
@@ -127,9 +141,11 @@ export class AnalyticsService {
           name: product?.name || 'Unknown',
           category: product?.category?.name || 'General',
           sales_count: tp._sum.quantity,
-          revenue: Number(tp._sum.quantity || 0) * Number(product?.new_price || product?.base_price || 0),
+          revenue:
+            Number(tp._sum.quantity || 0) *
+            Number(product?.new_price || product?.base_price || 0),
         };
-      })
+      }),
     );
 
     return successResponse('Best selling products fetched', products);
@@ -153,12 +169,12 @@ export class AnalyticsService {
     });
 
     return successResponse('Alerts and recent activity fetched', {
-      low_stock: lowStock.map(p => ({
+      low_stock: lowStock.map((p) => ({
         name: p.name,
         stock: p.stock_quantity,
         category: p.category.name,
       })),
-      recent_orders: recentOrders.map(o => ({
+      recent_orders: recentOrders.map((o) => ({
         id: `#${o.order_number}`,
         customer: o.customer_name || 'Guest',
         amount: `৳ ${o.total_amount}`,
@@ -175,7 +191,11 @@ export class AnalyticsService {
     return `${change > 0 ? '+' : ''}${change.toFixed(1)}%`;
   }
 
-  private groupByDay(data: any[], days: number, type: 'count' | 'revenue' = 'count') {
+  private groupByDay(
+    data: any[],
+    days: number,
+    type: 'count' | 'revenue' = 'count',
+  ) {
     const result: { day: string; value: number }[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
@@ -192,7 +212,10 @@ export class AnalyticsService {
       if (type === 'count') {
         result.push({ day: dayLabel, value: dayData.length });
       } else {
-        const sum = dayData.reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0);
+        const sum = dayData.reduce(
+          (acc, curr) => acc + Number(curr.total_amount || 0),
+          0,
+        );
         result.push({ day: dayLabel, value: sum });
       }
     }
@@ -210,20 +233,20 @@ export class AnalyticsService {
         include: {
           order_items: {
             include: {
-              product: { select: { cost_price: true } }
-            }
-          }
-        }
+              product: { select: { cost_price: true } },
+            },
+          },
+        },
       }),
       this.prisma.deliveryBooking.findMany({
-        where: { created_at: { gte: startDate } }
+        where: { created_at: { gte: startDate } },
       }),
       this.prisma.businessExpense.findMany({
-        where: { date: { gte: startDate } }
+        where: { date: { gte: startDate } },
       }),
       this.prisma.manualLedgerEntry.findMany({
-        where: { date: { gte: startDate } }
-      })
+        where: { date: { gte: startDate } },
+      }),
     ]);
 
     const formatDateStr = (d: Date) => {
@@ -233,50 +256,61 @@ export class AnalyticsService {
       return `${year}-${month}-${day}`;
     };
 
-    const dailyMap: { [dateStr: string]: { date: string; label: string; revenue: number; expenses: number; profit: number } } = {};
+    const dailyMap: {
+      [dateStr: string]: {
+        date: string;
+        label: string;
+        revenue: number;
+        expenses: number;
+        profit: number;
+      };
+    } = {};
 
     for (let i = 180; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = formatDateStr(d);
-      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const label = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
       dailyMap[dateStr] = {
         date: dateStr,
         label,
         revenue: 0,
         expenses: 0,
-        profit: 0
+        profit: 0,
       };
     }
 
-    orders.forEach(o => {
+    orders.forEach((o) => {
       const dateStr = formatDateStr(o.created_at);
       if (dailyMap[dateStr]) {
         if (o.order_status === 'delivered' || o.order_status === 'shipped') {
           dailyMap[dateStr].revenue += Number(o.total_amount || 0);
           const prodCost = o.order_items.reduce((sum, item) => {
-            return sum + (Number(item.product.cost_price || 0) * item.quantity);
+            return sum + Number(item.product.cost_price || 0) * item.quantity;
           }, 0);
           dailyMap[dateStr].expenses += prodCost;
         }
       }
     });
 
-    bookings.forEach(b => {
+    bookings.forEach((b) => {
       const dateStr = formatDateStr(b.created_at);
       if (dailyMap[dateStr]) {
         dailyMap[dateStr].expenses += 60; // Standard booking fee
       }
     });
 
-    expenses.forEach(e => {
+    expenses.forEach((e) => {
       const dateStr = formatDateStr(e.date);
       if (dailyMap[dateStr]) {
         dailyMap[dateStr].expenses += Number(e.amount || 0);
       }
     });
 
-    manualEntries.forEach(m => {
+    manualEntries.forEach((m) => {
       const dateStr = formatDateStr(m.date);
       if (dailyMap[dateStr]) {
         dailyMap[dateStr].revenue += Number(m.sale_amount || 0);
@@ -284,21 +318,31 @@ export class AnalyticsService {
       }
     });
 
-    Object.keys(dailyMap).forEach(key => {
+    Object.keys(dailyMap).forEach((key) => {
       const item = dailyMap[key];
       item.revenue = Math.round(item.revenue * 100) / 100;
       item.expenses = Math.round(item.expenses * 100) / 100;
       item.profit = Math.round((item.revenue - item.expenses) * 100) / 100;
     });
 
-    const sortedDays = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
-    
+    const sortedDays = Object.values(dailyMap).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
+
     // 1. Daily (Last 15 days)
     const dailyData = sortedDays.slice(-15);
 
     // 2. Weekly (Last 8 weeks)
-    const weeklyMap: { [weekLabel: string]: { label: string; revenue: number; expenses: number; profit: number; order: number } } = {};
-    sortedDays.forEach(day => {
+    const weeklyMap: {
+      [weekLabel: string]: {
+        label: string;
+        revenue: number;
+        expenses: number;
+        profit: number;
+        order: number;
+      };
+    } = {};
+    sortedDays.forEach((day) => {
       const d = new Date(day.date);
       const dayOfWeek = d.getDay();
       const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
@@ -311,7 +355,7 @@ export class AnalyticsService {
           revenue: 0,
           expenses: 0,
           profit: 0,
-          order: monday.getTime()
+          order: monday.getTime(),
         };
       }
       weeklyMap[weekLabel].revenue += day.revenue;
@@ -326,14 +370,25 @@ export class AnalyticsService {
         label,
         revenue: Math.round(revenue),
         expenses: Math.round(expenses),
-        profit: Math.round(profit)
+        profit: Math.round(profit),
       }));
 
     // 3. Monthly (Last 6 months)
-    const monthlyMap: { [monthLabel: string]: { label: string; revenue: number; expenses: number; profit: number; order: number } } = {};
-    sortedDays.forEach(day => {
+    const monthlyMap: {
+      [monthLabel: string]: {
+        label: string;
+        revenue: number;
+        expenses: number;
+        profit: number;
+        order: number;
+      };
+    } = {};
+    sortedDays.forEach((day) => {
       const d = new Date(day.date);
-      const monthLabel = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      const monthLabel = d.toLocaleDateString('en-US', {
+        month: 'short',
+        year: '2-digit',
+      });
       const orderKey = d.getFullYear() * 12 + d.getMonth();
 
       if (!monthlyMap[monthLabel]) {
@@ -342,7 +397,7 @@ export class AnalyticsService {
           revenue: 0,
           expenses: 0,
           profit: 0,
-          order: orderKey
+          order: orderKey,
         };
       }
       monthlyMap[monthLabel].revenue += day.revenue;
@@ -357,7 +412,7 @@ export class AnalyticsService {
         label,
         revenue: Math.round(revenue),
         expenses: Math.round(expenses),
-        profit: Math.round(profit)
+        profit: Math.round(profit),
       }));
 
     return {
@@ -365,8 +420,8 @@ export class AnalyticsService {
       data: {
         daily: dailyData,
         weekly: weeklyData,
-        monthly: monthlyData
-      }
+        monthly: monthlyData,
+      },
     };
   }
 
@@ -377,7 +432,7 @@ export class AnalyticsService {
 
     const orders = await this.prisma.order.findMany({
       where: { created_at: { gte: startDate }, deleted_at: null },
-      select: { created_at: true, total_amount: true, order_status: true }
+      select: { created_at: true, total_amount: true, order_status: true },
     });
 
     const formatDateStr = (d: Date) => {
@@ -387,22 +442,32 @@ export class AnalyticsService {
       return `${year}-${month}-${day}`;
     };
 
-    const dailyMap: { [dateStr: string]: { date: string; label: string; orders: number; revenue: number } } = {};
+    const dailyMap: {
+      [dateStr: string]: {
+        date: string;
+        label: string;
+        orders: number;
+        revenue: number;
+      };
+    } = {};
 
     for (let i = 180; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = formatDateStr(d);
-      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const label = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
       dailyMap[dateStr] = {
         date: dateStr,
         label,
         orders: 0,
-        revenue: 0
+        revenue: 0,
       };
     }
 
-    orders.forEach(o => {
+    orders.forEach((o) => {
       const dateStr = formatDateStr(o.created_at);
       if (dailyMap[dateStr]) {
         dailyMap[dateStr].orders += 1;
@@ -412,17 +477,26 @@ export class AnalyticsService {
       }
     });
 
-    Object.keys(dailyMap).forEach(key => {
+    Object.keys(dailyMap).forEach((key) => {
       const item = dailyMap[key];
       item.revenue = Math.round(item.revenue * 100) / 100;
     });
 
-    const sortedDays = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+    const sortedDays = Object.values(dailyMap).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
 
     const dailyData = sortedDays.slice(-15);
 
-    const weeklyMap: { [weekLabel: string]: { label: string; orders: number; revenue: number; order: number } } = {};
-    sortedDays.forEach(day => {
+    const weeklyMap: {
+      [weekLabel: string]: {
+        label: string;
+        orders: number;
+        revenue: number;
+        order: number;
+      };
+    } = {};
+    sortedDays.forEach((day) => {
       const d = new Date(day.date);
       const dayOfWeek = d.getDay();
       const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
@@ -434,7 +508,7 @@ export class AnalyticsService {
           label: weekLabel,
           orders: 0,
           revenue: 0,
-          order: monday.getTime()
+          order: monday.getTime(),
         };
       }
       weeklyMap[weekLabel].orders += day.orders;
@@ -447,13 +521,23 @@ export class AnalyticsService {
       .map(({ label, orders, revenue }) => ({
         label,
         orders,
-        revenue: Math.round(revenue)
+        revenue: Math.round(revenue),
       }));
 
-    const monthlyMap: { [monthLabel: string]: { label: string; orders: number; revenue: number; order: number } } = {};
-    sortedDays.forEach(day => {
+    const monthlyMap: {
+      [monthLabel: string]: {
+        label: string;
+        orders: number;
+        revenue: number;
+        order: number;
+      };
+    } = {};
+    sortedDays.forEach((day) => {
       const d = new Date(day.date);
-      const monthLabel = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      const monthLabel = d.toLocaleDateString('en-US', {
+        month: 'short',
+        year: '2-digit',
+      });
       const orderKey = d.getFullYear() * 12 + d.getMonth();
 
       if (!monthlyMap[monthLabel]) {
@@ -461,7 +545,7 @@ export class AnalyticsService {
           label: monthLabel,
           orders: 0,
           revenue: 0,
-          order: orderKey
+          order: orderKey,
         };
       }
       monthlyMap[monthLabel].orders += day.orders;
@@ -474,7 +558,7 @@ export class AnalyticsService {
       .map(({ label, orders, revenue }) => ({
         label,
         orders,
-        revenue: Math.round(revenue)
+        revenue: Math.round(revenue),
       }));
 
     return {
@@ -482,9 +566,8 @@ export class AnalyticsService {
       data: {
         daily: dailyData,
         weekly: weeklyData,
-        monthly: monthlyData
-      }
+        monthly: monthlyData,
+      },
     };
   }
 }
-

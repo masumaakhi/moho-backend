@@ -1,17 +1,26 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class CartService {
-  constructor(private prisma: PrismaService, private jwtService: JwtService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
   private extractUserId(authHeader?: string): string | null {
     if (!authHeader) return null;
     const token = authHeader.split(' ')[1];
     if (!token) return null;
     try {
-      const decoded = this.jwtService.verify(token, { secret: process.env.JWT_ACCESS_SECRET || 'access_secret' });
+      const decoded = this.jwtService.verify(token, {
+        secret: process.env.JWT_ACCESS_SECRET || 'access_secret',
+      });
       return decoded.sub;
     } catch {
       return null;
@@ -20,25 +29,25 @@ export class CartService {
 
   async getCart(sessionId: string, authHeader?: string) {
     const userId = this.extractUserId(authHeader);
-    
+
     if (!userId && !sessionId) return { items: [], subtotal: 0 };
 
-    let cart = await this.prisma.cart.findFirst({
+    const cart = await this.prisma.cart.findFirst({
       where: {
         status: 'active',
         OR: [
           ...(userId ? [{ user_id: userId }] : []),
-          ...(sessionId ? [{ session_id: sessionId }] : [])
-        ]
+          ...(sessionId ? [{ session_id: sessionId }] : []),
+        ],
       },
       include: {
         items: {
           include: {
             product: { include: { images: true } },
-            variant: true
-          }
-        }
-      }
+            variant: true,
+          },
+        },
+      },
     });
 
     if (!cart) {
@@ -46,23 +55,36 @@ export class CartService {
     }
 
     // Merge carts if needed? Simplest approach is just return found cart
-    const subtotal = cart.items.reduce((acc, item) => acc + (Number(item.price) * item.quantity), 0);
+    const subtotal = cart.items.reduce(
+      (acc, item) => acc + Number(item.price) * item.quantity,
+      0,
+    );
     return { ...cart, subtotal };
   }
 
-  async addToCart(sessionId: string, authHeader: string, dto: { productId: string; variantId?: string; quantity: number }) {
+  async addToCart(
+    sessionId: string,
+    authHeader: string,
+    dto: { productId: string; variantId?: string; quantity: number },
+  ) {
     const userId = this.extractUserId(authHeader);
-    if (!sessionId && !userId) throw new BadRequestException('Session ID is required');
+    if (!sessionId && !userId)
+      throw new BadRequestException('Session ID is required');
 
     // Check stock
-    const product = await this.prisma.product.findUnique({ where: { id: dto.productId }});
-    if (!product || product.status !== 'active') throw new NotFoundException('Product not available');
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+    });
+    if (!product || product.status !== 'active')
+      throw new NotFoundException('Product not available');
 
     let price = product.new_price || product.base_price;
     let availableStock = product.stock_quantity;
 
     if (dto.variantId) {
-      const variant = await this.prisma.productVariant.findUnique({ where: { id: dto.variantId }});
+      const variant = await this.prisma.productVariant.findUnique({
+        where: { id: dto.variantId },
+      });
       if (!variant) throw new NotFoundException('Variant not found');
       if (variant.price) price = variant.price;
       availableStock = variant.stock;
@@ -72,7 +94,8 @@ export class CartService {
       throw new BadRequestException('Not enough stock available');
     }
 
-    if (!sessionId && !userId) throw new BadRequestException('Session ID is required');
+    if (!sessionId && !userId)
+      throw new BadRequestException('Session ID is required');
 
     // Find or create cart
     let cart = await this.prisma.cart.findFirst({
@@ -80,21 +103,24 @@ export class CartService {
         status: 'active',
         OR: [
           ...(userId ? [{ user_id: userId }] : []),
-          ...(sessionId ? [{ session_id: sessionId }] : [])
-        ]
-      }
+          ...(sessionId ? [{ session_id: sessionId }] : []),
+        ],
+      },
     });
 
     if (!cart) {
       cart = await this.prisma.cart.create({
         data: {
           user_id: userId,
-          session_id: sessionId
-        }
+          session_id: sessionId,
+        },
       });
     } else if (userId && !cart.user_id) {
       // update cart with user id
-      await this.prisma.cart.update({ where: { id: cart.id }, data: { user_id: userId } });
+      await this.prisma.cart.update({
+        where: { id: cart.id },
+        data: { user_id: userId },
+      });
     }
 
     // Find existing item
@@ -102,18 +128,20 @@ export class CartService {
       where: {
         cart_id: cart.id,
         product_id: dto.productId,
-        variant_id: dto.variantId || null
-      }
+        variant_id: dto.variantId || null,
+      },
     });
 
     if (existingItem) {
       const newQty = existingItem.quantity + dto.quantity;
       if (availableStock < newQty) {
-         throw new BadRequestException('Not enough stock available for this quantity');
+        throw new BadRequestException(
+          'Not enough stock available for this quantity',
+        );
       }
       await this.prisma.cartItem.update({
         where: { id: existingItem.id },
-        data: { quantity: newQty }
+        data: { quantity: newQty },
       });
     } else {
       await this.prisma.cartItem.create({
@@ -122,8 +150,8 @@ export class CartService {
           product_id: dto.productId,
           variant_id: dto.variantId || null,
           quantity: dto.quantity,
-          price: price
-        }
+          price: price,
+        },
       });
     }
 
@@ -133,24 +161,29 @@ export class CartService {
   async updateCartItem(itemId: string, quantity: number) {
     if (quantity <= 0) return this.removeCartItem(itemId);
 
-    const item = await this.prisma.cartItem.findUnique({ where: { id: itemId }, include: { product: true, variant: true }});
+    const item = await this.prisma.cartItem.findUnique({
+      where: { id: itemId },
+      include: { product: true, variant: true },
+    });
     if (!item) throw new NotFoundException('Item not found');
 
-    const availableStock = item.variant ? item.variant.stock : item.product.stock_quantity;
+    const availableStock = item.variant
+      ? item.variant.stock
+      : item.product.stock_quantity;
     if (availableStock < quantity) {
       throw new BadRequestException('Not enough stock available');
     }
 
     await this.prisma.cartItem.update({
       where: { id: itemId },
-      data: { quantity }
+      data: { quantity },
     });
 
     return { success: true };
   }
 
   async removeCartItem(itemId: string) {
-    await this.prisma.cartItem.delete({ where: { id: itemId }});
+    await this.prisma.cartItem.delete({ where: { id: itemId } });
     return { success: true };
   }
 }

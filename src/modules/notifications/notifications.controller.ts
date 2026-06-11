@@ -1,4 +1,14 @@
-import { Controller, Get, Patch, Param, Query, UseGuards, Req, Post, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  Post,
+  Body,
+} from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 import { successResponse } from '../../common/responses/api-response';
@@ -47,7 +57,9 @@ export class NotificationsController {
   }
 
   @Post('system/low-stock')
-  async createLowStock(@Body() dto: { productId: string; name: string; stock: number }) {
+  async createLowStock(
+    @Body() dto: { productId: string; name: string; stock: number },
+  ) {
     await this.notificationsService.create({
       type: 'low-stock',
       title: 'Low Stock Alert',

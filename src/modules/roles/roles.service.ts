@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
@@ -57,7 +62,7 @@ export class RolesService {
 
       if (dto.permission_ids.length > 0) {
         await tx.rolePermission.createMany({
-          data: dto.permission_ids.map(p_id => ({
+          data: dto.permission_ids.map((p_id) => ({
             role_id: newRole.id,
             permission_id: p_id,
           })),
@@ -80,7 +85,8 @@ export class RolesService {
 
   async update(id: string, adminUserId: string, dto: UpdateRoleDto) {
     const role = await this.findOne(id);
-    if (role.is_system) throw new ForbiddenException('Cannot modify system roles');
+    if (role.is_system)
+      throw new ForbiddenException('Cannot modify system roles');
 
     const updatedRole = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.role.update({
@@ -100,7 +106,7 @@ export class RolesService {
         // Add new permissions
         if (dto.permission_ids.length > 0) {
           await tx.rolePermission.createMany({
-            data: dto.permission_ids.map(p_id => ({
+            data: dto.permission_ids.map((p_id) => ({
               role_id: id,
               permission_id: p_id,
             })),
@@ -124,13 +130,15 @@ export class RolesService {
 
   async delete(id: string, adminUserId: string) {
     const role = await this.findOne(id);
-    if (role.is_system) throw new ForbiddenException('Cannot delete system roles');
+    if (role.is_system)
+      throw new ForbiddenException('Cannot delete system roles');
 
     // Check if any admin is using this role
     const admins = await this.prisma.adminUser.count({
       where: { role_id: id, deleted_at: null },
     });
-    if (admins > 0) throw new ForbiddenException('Cannot delete role assigned to admins');
+    if (admins > 0)
+      throw new ForbiddenException('Cannot delete role assigned to admins');
 
     await this.prisma.role.update({
       where: { id },

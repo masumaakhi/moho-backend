@@ -11,7 +11,12 @@ export class FraudService {
     private activityLogs: ActivityLogsService,
   ) {}
 
-  async checkFraudAndDuplicates(orderId: string, customerPhone: string, shippingAddress: string, items: any[]) {
+  async checkFraudAndDuplicates(
+    orderId: string,
+    customerPhone: string,
+    shippingAddress: string,
+    items: any[],
+  ) {
     let fraudScore = 0;
     const reasons: string[] = [];
     const duplicateMatches: any[] = [];
@@ -23,7 +28,9 @@ export class FraudService {
 
     if (blacklisted) {
       fraudScore += 100;
-      reasons.push(`Phone number ${customerPhone} is blacklisted: ${blacklisted.reason || 'No reason provided'}`);
+      reasons.push(
+        `Phone number ${customerPhone} is blacklisted: ${blacklisted.reason || 'No reason provided'}`,
+      );
     }
 
     // 2. Duplicate Order Check (Orders within last 24h with same phone or address)
@@ -36,7 +43,12 @@ export class FraudService {
         created_at: { gte: oneDayAgo },
         OR: [
           { customer_phone: customerPhone },
-          { shipping_address: { contains: shippingAddress.substring(0, 20), mode: 'insensitive' } },
+          {
+            shipping_address: {
+              contains: shippingAddress.substring(0, 20),
+              mode: 'insensitive',
+            },
+          },
         ],
         deleted_at: null,
       },
@@ -52,15 +64,21 @@ export class FraudService {
         matchedFields.push('phone');
       }
 
-      if (oldOrder.shipping_address && oldOrder.shipping_address.toLowerCase() === shippingAddress.toLowerCase()) {
+      if (
+        oldOrder.shipping_address &&
+        oldOrder.shipping_address.toLowerCase() ===
+          shippingAddress.toLowerCase()
+      ) {
         matchScore += 40;
         matchedFields.push('address');
       }
 
       // Check for same products
-      const oldProductIds = oldOrder.order_items.map(i => i.product_id);
-      const newProductIds = items.map(i => i.product_id);
-      const commonProducts = oldProductIds.filter(id => newProductIds.includes(id));
+      const oldProductIds = oldOrder.order_items.map((i) => i.product_id);
+      const newProductIds = items.map((i) => i.product_id);
+      const commonProducts = oldProductIds.filter((id) =>
+        newProductIds.includes(id),
+      );
 
       if (commonProducts.length > 0) {
         matchScore += 30;
@@ -73,9 +91,11 @@ export class FraudService {
           match_percentage: Math.min(matchScore, 100),
           matched_fields: matchedFields,
         });
-        
+
         fraudScore += 20;
-        reasons.push(`Duplicate pattern found with Order #${oldOrder.order_number} (${matchedFields.join(', ')})`);
+        reasons.push(
+          `Duplicate pattern found with Order #${oldOrder.order_number} (${matchedFields.join(', ')})`,
+        );
       }
     }
 
@@ -94,7 +114,9 @@ export class FraudService {
 
       if (badOrders > 2) {
         fraudScore += 30;
-        reasons.push(`Customer has ${badOrders} previous cancelled/returned orders`);
+        reasons.push(
+          `Customer has ${badOrders} previous cancelled/returned orders`,
+        );
       }
     }
 
@@ -163,7 +185,10 @@ export class FraudService {
     };
   }
 
-  async addToBlacklist(adminId: string, data: { phone: string; reason?: string }) {
+  async addToBlacklist(
+    adminId: string,
+    data: { phone: string; reason?: string },
+  ) {
     const existing = await this.prisma.fraudBlacklistNumber.findUnique({
       where: { phone: data.phone },
     });
@@ -209,14 +234,14 @@ export class FraudService {
         where,
         include: {
           order: {
-            include: { 
-              user: true, 
+            include: {
+              user: true,
               customer: true,
               duplicate_new_matches: {
                 include: {
-                  old_order: true
-                }
-              }
+                  old_order: true,
+                },
+              },
             },
           },
         },
@@ -233,11 +258,15 @@ export class FraudService {
     };
   }
 
-  async reviewOrder(adminId: string, id: string, action: 'approve' | 'block' | 'mark_safe' | 'blacklist') {
+  async reviewOrder(
+    adminId: string,
+    id: string,
+    action: 'approve' | 'block' | 'mark_safe' | 'blacklist',
+  ) {
     const suspicious = await (this.prisma.suspiciousOrder as any).findUnique({
       where: { id },
       include: { order: true },
-    }) as any;
+    });
 
     if (!suspicious) throw new Error('Suspicious order not found');
 
@@ -272,7 +301,10 @@ export class FraudService {
         data: { order_status: 'pending' },
       });
     } else if (action === 'blacklist') {
-      await this.addToBlacklist(adminId, { phone, reason: 'Manual blacklist from fraud review' });
+      await this.addToBlacklist(adminId, {
+        phone,
+        reason: 'Manual blacklist from fraud review',
+      });
       await this.prisma.suspiciousOrder.update({
         where: { id },
         data: { status: 'blocked' },

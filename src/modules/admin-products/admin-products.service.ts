@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateProductDto, UpdateProductDto, CreateCategoryDto } from './dto/admin-product.dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  CreateCategoryDto,
+} from './dto/admin-product.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import * as ExcelJS from 'exceljs';
@@ -10,7 +18,7 @@ export class AdminProductsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
-    private activityLogs: ActivityLogsService
+    private activityLogs: ActivityLogsService,
   ) {}
 
   async getProducts(query: any) {
@@ -40,9 +48,9 @@ export class AdminProductsService {
         include: { category: true, images: true },
         skip: Number(skip),
         take: Number(limit),
-        orderBy: { created_at: 'desc' }
+        orderBy: { created_at: 'desc' },
       }),
-      this.prisma.product.count({ where })
+      this.prisma.product.count({ where }),
     ]);
 
     return {
@@ -50,8 +58,8 @@ export class AdminProductsService {
       meta: {
         total,
         page: Number(page),
-        last_page: Math.ceil(total / limit)
-      }
+        last_page: Math.ceil(total / limit),
+      },
     };
   }
 
@@ -62,8 +70,8 @@ export class AdminProductsService {
         category: true,
         images: true,
         variants: true,
-        faqs: true
-      }
+        faqs: true,
+      },
     });
 
     if (!product) {
@@ -75,21 +83,33 @@ export class AdminProductsService {
 
   async createProduct(adminUserId: string, dto: CreateProductDto) {
     // 1. Category check
-    const categoryExists = await this.prisma.category.findUnique({ where: { id: dto.category_id } });
+    const categoryExists = await this.prisma.category.findUnique({
+      where: { id: dto.category_id },
+    });
     if (!categoryExists) {
       throw new BadRequestException('Category required or does not exist');
     }
 
     // 2. SKU duplicate check
     if (dto.sku) {
-      const skuExists = await this.prisma.product.findUnique({ where: { sku: dto.sku } });
+      const skuExists = await this.prisma.product.findUnique({
+        where: { sku: dto.sku },
+      });
       if (skuExists) {
-        throw new BadRequestException(`Product with SKU "${dto.sku}" already exists`);
+        throw new BadRequestException(
+          `Product with SKU "${dto.sku}" already exists`,
+        );
       }
     }
 
     // 3. Slug generation
-    const slug = dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now();
+    const slug =
+      dto.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '') +
+      '-' +
+      Date.now();
 
     const product = await this.prisma.product.create({
       data: {
@@ -108,28 +128,31 @@ export class AdminProductsService {
         is_trending: dto.is_trending || false,
         is_free_delivery: dto.is_free_delivery || false,
         images: {
-          create: dto.images?.map((img, index) => ({
-            image_url: img.image_url,
-            alt_text: img.alt_text,
-            sort_order: index
-          })) || []
+          create:
+            dto.images?.map((img, index) => ({
+              image_url: img.image_url,
+              alt_text: img.alt_text,
+              sort_order: index,
+            })) || [],
         },
         variants: {
-          create: dto.variants?.map(v => ({
-            name: v.name,
-            value: v.value,
-            sku: v.sku,
-            price: v.price,
-            stock: v.stock || 0
-          })) || []
+          create:
+            dto.variants?.map((v) => ({
+              name: v.name,
+              value: v.value,
+              sku: v.sku,
+              price: v.price,
+              stock: v.stock || 0,
+            })) || [],
         },
         faqs: {
-          create: dto.faqs?.map(f => ({
-            question: f.question,
-            answer: f.answer
-          })) || []
-        }
-      }
+          create:
+            dto.faqs?.map((f) => ({
+              question: f.question,
+              answer: f.answer,
+            })) || [],
+        },
+      },
     });
 
     // Create activity log
@@ -141,7 +164,7 @@ export class AdminProductsService {
       entity_type: 'product',
       entity_id: product.id,
       description: `Product "${product.name}" created`,
-      details: { name: product.name }
+      details: { name: product.name },
     });
 
     return product;
@@ -154,7 +177,9 @@ export class AdminProductsService {
     }
 
     if (dto.category_id) {
-      const catExists = await this.prisma.category.findUnique({ where: { id: dto.category_id } });
+      const catExists = await this.prisma.category.findUnique({
+        where: { id: dto.category_id },
+      });
       if (!catExists) throw new BadRequestException('Category not found');
     }
 
@@ -162,11 +187,13 @@ export class AdminProductsService {
       const skuExists = await this.prisma.product.findFirst({
         where: {
           sku: dto.sku,
-          id: { not: id }
-        }
+          id: { not: id },
+        },
       });
       if (skuExists) {
-        throw new BadRequestException(`Product with SKU "${dto.sku}" already exists`);
+        throw new BadRequestException(
+          `Product with SKU "${dto.sku}" already exists`,
+        );
       }
     }
 
@@ -189,36 +216,42 @@ export class AdminProductsService {
     };
 
     if (dto.images !== undefined) {
-      deleteOps.push(this.prisma.productImage.deleteMany({ where: { product_id: id } }));
+      deleteOps.push(
+        this.prisma.productImage.deleteMany({ where: { product_id: id } }),
+      );
       createData.images = {
         create: dto.images.map((img, index) => ({
           image_url: img.image_url,
           alt_text: img.alt_text,
-          sort_order: index
-        }))
+          sort_order: index,
+        })),
       };
     }
 
     if (dto.variants !== undefined) {
-      deleteOps.push(this.prisma.productVariant.deleteMany({ where: { product_id: id } }));
+      deleteOps.push(
+        this.prisma.productVariant.deleteMany({ where: { product_id: id } }),
+      );
       createData.variants = {
-        create: dto.variants.map(v => ({
+        create: dto.variants.map((v) => ({
           name: v.name,
           value: v.value,
           sku: v.sku,
           price: v.price,
-          stock: v.stock || 0
-        }))
+          stock: v.stock || 0,
+        })),
       };
     }
 
     if (dto.faqs !== undefined) {
-      deleteOps.push(this.prisma.productFAQ.deleteMany({ where: { product_id: id } }));
+      deleteOps.push(
+        this.prisma.productFAQ.deleteMany({ where: { product_id: id } }),
+      );
       createData.faqs = {
-        create: dto.faqs.map(f => ({
+        create: dto.faqs.map((f) => ({
           question: f.question,
-          answer: f.answer
-        }))
+          answer: f.answer,
+        })),
       };
     }
 
@@ -229,7 +262,7 @@ export class AdminProductsService {
 
     const updated = await this.prisma.product.update({
       where: { id },
-      data: createData
+      data: createData,
     });
 
     // Low stock notification
@@ -237,7 +270,7 @@ export class AdminProductsService {
       await this.notifications.create({
         type: 'low-stock',
         title: 'Low Stock Alert',
-        message: `Product ${updated.name} is running low on stock (${updated.stock_quantity} left).`
+        message: `Product ${updated.name} is running low on stock (${updated.stock_quantity} left).`,
       });
     }
 
@@ -248,8 +281,8 @@ export class AdminProductsService {
         action: 'update_product',
         entity_type: 'product',
         entity_id: updated.id,
-        details: { name: updated.name }
-      }
+        details: { name: updated.name },
+      },
     });
 
     return updated;
@@ -264,7 +297,7 @@ export class AdminProductsService {
     // Soft delete
     await this.prisma.product.update({
       where: { id },
-      data: { deleted_at: new Date(), status: 'inactive' }
+      data: { deleted_at: new Date(), status: 'inactive' },
     });
 
     // Activity log
@@ -274,8 +307,8 @@ export class AdminProductsService {
         action: 'delete_product',
         entity_type: 'product',
         entity_id: id,
-        details: { name: existing.name }
-      }
+        details: { name: existing.name },
+      },
     });
 
     return { success: true, message: 'Product deleted' };
@@ -290,12 +323,12 @@ export class AdminProductsService {
     await this.prisma.product.updateMany({
       where: {
         id: { in: ids },
-        deleted_at: null
+        deleted_at: null,
       },
       data: {
         deleted_at: new Date(),
-        status: 'inactive'
-      }
+        status: 'inactive',
+      },
     });
 
     // Create activity log
@@ -306,7 +339,7 @@ export class AdminProductsService {
       action: 'delete_products_bulk',
       entity_type: 'product',
       description: `Bulk deleted ${ids.length} products`,
-      details: { count: ids.length, ids }
+      details: { count: ids.length, ids },
     });
 
     return { success: true, message: `${ids.length} products deleted` };
@@ -314,20 +347,26 @@ export class AdminProductsService {
 
   async getCategories() {
     return this.prisma.category.findMany({
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
     });
   }
 
   async createCategory(dto: CreateCategoryDto) {
-    const slug = dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now();
+    const slug =
+      dto.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '') +
+      '-' +
+      Date.now();
     return this.prisma.category.create({
       data: {
         name: dto.name,
         slug,
         description: dto.description,
         image_url: dto.image_url,
-        status: dto.status || 'active'
-      }
+        status: dto.status || 'active',
+      },
     });
   }
 
@@ -337,7 +376,7 @@ export class AdminProductsService {
       include: {
         category: true,
         variants: true,
-      }
+      },
     });
 
     const workbook = new ExcelJS.Workbook();
@@ -355,7 +394,7 @@ export class AdminProductsService {
       { header: 'Created At', key: 'created_at', width: 20 },
     ];
 
-    products.forEach(p => {
+    products.forEach((p) => {
       worksheet.addRow({
         id: p.id,
         name: p.name,
@@ -369,7 +408,10 @@ export class AdminProductsService {
       });
     });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
     res.setHeader('Content-Disposition', 'attachment; filename=products.xlsx');
 
     await workbook.xlsx.write(res);

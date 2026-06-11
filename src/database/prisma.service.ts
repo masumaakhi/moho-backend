@@ -1,4 +1,9 @@
-import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 
@@ -12,7 +17,7 @@ export class PrismaService
 
   constructor(config: ConfigService) {
     let dbUrl = config.get<string>('DATABASE_URL') || '';
-    
+
     // Dynamically optimize database connection pool parameters
     if (dbUrl) {
       try {
@@ -51,13 +56,13 @@ export class PrismaService
                 error.code === 'P1001' || // Can't reach database server
                 error.code === 'P2024' || // Connection pool timeout
                 error.message?.includes('connection pool') ||
-                error.message?.includes('Can\'t reach database server') ||
+                error.message?.includes("Can't reach database server") ||
                 error.message?.includes('Timed out fetching a new connection');
 
               if (isTransient && attempt < maxRetries) {
                 const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff: 300ms, 600ms
                 baseClient.logger.warn(
-                  `Database transient error (${error.code || 'UNKNOWN'}). Retrying query on model '${model}' operation '${operation}' (Attempt ${attempt}/${maxRetries}) in ${delay}ms...`
+                  `Database transient error (${error.code || 'UNKNOWN'}). Retrying query on model '${model}' operation '${operation}' (Attempt ${attempt}/${maxRetries}) in ${delay}ms...`,
                 );
                 await new Promise((resolve) => setTimeout(resolve, delay));
                 attempt++;

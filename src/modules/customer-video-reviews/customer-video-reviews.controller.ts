@@ -1,6 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { CustomerVideoReviewsService } from './customer-video-reviews.service';
-import { CreateVideoReviewDto, UpdateVideoReviewDto } from './dto/video-review.dto';
+import {
+  CreateVideoReviewDto,
+  UpdateVideoReviewDto,
+} from './dto/video-review.dto';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 
 @Controller('admin/video-reviews')

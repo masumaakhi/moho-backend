@@ -41,13 +41,15 @@ export class CouponsService {
       code: data.code.toUpperCase(),
       discount_value: Number(data.discount_value),
       min_order_amount: Number(data.min_order_amount || 0),
-      max_discount_amount: data.max_discount_amount ? Number(data.max_discount_amount) : null,
+      max_discount_amount: data.max_discount_amount
+        ? Number(data.max_discount_amount)
+        : null,
       expiry_date: data.expiry_date ? new Date(data.expiry_date) : null,
       usage_limit: data.usage_limit ? Number(data.usage_limit) : null,
     };
 
     const coupon = await this.prisma.coupon.create({ data: payload });
-    
+
     await this.activityLogs.create({
       actor_type: 'admin',
       user_id: adminId,
@@ -64,11 +66,20 @@ export class CouponsService {
   async update(adminId: string, id: string, data: any) {
     const payload: any = { ...data };
     if (data.code) payload.code = data.code.toUpperCase();
-    if (data.discount_value !== undefined) payload.discount_value = Number(data.discount_value);
-    if (data.min_order_amount !== undefined) payload.min_order_amount = Number(data.min_order_amount);
-    if (data.max_discount_amount !== undefined) payload.max_discount_amount = data.max_discount_amount ? Number(data.max_discount_amount) : null;
-    if (data.expiry_date !== undefined) payload.expiry_date = data.expiry_date ? new Date(data.expiry_date) : null;
-    if (data.usage_limit !== undefined) payload.usage_limit = data.usage_limit ? Number(data.usage_limit) : null;
+    if (data.discount_value !== undefined)
+      payload.discount_value = Number(data.discount_value);
+    if (data.min_order_amount !== undefined)
+      payload.min_order_amount = Number(data.min_order_amount);
+    if (data.max_discount_amount !== undefined)
+      payload.max_discount_amount = data.max_discount_amount
+        ? Number(data.max_discount_amount)
+        : null;
+    if (data.expiry_date !== undefined)
+      payload.expiry_date = data.expiry_date
+        ? new Date(data.expiry_date)
+        : null;
+    if (data.usage_limit !== undefined)
+      payload.usage_limit = data.usage_limit ? Number(data.usage_limit) : null;
 
     const coupon = await this.prisma.coupon.update({
       where: { id },

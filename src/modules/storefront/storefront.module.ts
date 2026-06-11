@@ -4,6 +4,6 @@ import { StorefrontService } from './storefront.service';
 
 @Module({
   controllers: [StorefrontController],
-  providers: [StorefrontService]
+  providers: [StorefrontService],
 })
 export class StorefrontModule {}

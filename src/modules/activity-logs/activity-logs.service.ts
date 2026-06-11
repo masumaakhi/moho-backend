@@ -5,9 +5,9 @@ import { Response } from 'express';
 
 export class CreateActivityLogDto {
   actor_type?: string; // admin, customer, system
-  user_id?: string | null;    // actor_id
+  user_id?: string | null; // actor_id
   module_name?: string;
-  action: string;      // create, update, delete, login, etc.
+  action: string; // create, update, delete, login, etc.
   entity_type?: string;
   entity_id?: string;
   description?: string;
@@ -102,7 +102,7 @@ export class ActivityLogsService {
 
   async exportLogs(res: Response, query: any) {
     const logs = await this.findAll({ ...query, limit: 2000 });
-    
+
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Activity Logs');
 
@@ -115,7 +115,7 @@ export class ActivityLogsService {
       { header: 'IP Address', key: 'ip_address', width: 15 },
     ];
 
-    logs.items.forEach(log => {
+    logs.items.forEach((log) => {
       worksheet.addRow({
         created_at: log.created_at.toISOString(),
         actor_type: log.actor_type,
@@ -126,8 +126,14 @@ export class ActivityLogsService {
       });
     });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=activity_logs.xlsx');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=activity_logs.xlsx',
+    );
 
     await workbook.xlsx.write(res);
     res.end();

@@ -1,5 +1,18 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Req, Res } from '@nestjs/common';
-import { ActivityLogsService, CreateActivityLogDto } from './activity-logs.service';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  Res,
+} from '@nestjs/common';
+import {
+  ActivityLogsService,
+  CreateActivityLogDto,
+} from './activity-logs.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 import { successResponse } from '../../common/responses/api-response';
 

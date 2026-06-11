@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, Res, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Res,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 
@@ -57,11 +68,8 @@ export class ReportsController {
   }
 
   @Post('manual/prices')
-  saveManualPrices(
-    @Body() prices: any,
-    @Req() req: any,
-  ) {
-    const adminId = (req.user as any)?.sub;
+  saveManualPrices(@Body() prices: any, @Req() req: any) {
+    const adminId = req.user?.sub;
     return this.reportsService.saveManualPrices(prices, adminId);
   }
 
@@ -77,20 +85,14 @@ export class ReportsController {
   }
 
   @Post('manual')
-  saveManualEntry(
-    @Body() data: any,
-    @Req() req: any,
-  ) {
-    const adminId = (req.user as any)?.sub;
+  saveManualEntry(@Body() data: any, @Req() req: any) {
+    const adminId = req.user?.sub;
     return this.reportsService.saveManualEntry(data, adminId);
   }
 
   @Delete('manual/:id')
-  deleteManualEntry(
-    @Param('id') id: string,
-    @Req() req: any,
-  ) {
-    const adminId = (req.user as any)?.sub;
+  deleteManualEntry(@Param('id') id: string, @Req() req: any) {
+    const adminId = req.user?.sub;
     return this.reportsService.deleteManualEntry(id, adminId);
   }
 
@@ -105,8 +107,14 @@ export class ReportsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    const adminId = (req.user as any)?.sub;
-    return this.reportsService.exportToExcel(res, startDate, endDate, adminId, view);
+    const adminId = req.user?.sub;
+    return this.reportsService.exportToExcel(
+      res,
+      startDate,
+      endDate,
+      adminId,
+      view,
+    );
   }
 
   @Get('export/pdf')
@@ -117,7 +125,13 @@ export class ReportsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    const adminId = (req.user as any)?.sub;
-    return this.reportsService.exportToPdf(res, startDate, endDate, adminId, view);
+    const adminId = req.user?.sub;
+    return this.reportsService.exportToPdf(
+      res,
+      startDate,
+      endDate,
+      adminId,
+      view,
+    );
   }
 }

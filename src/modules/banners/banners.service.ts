@@ -52,7 +52,7 @@ export class BannersService {
 
   async create(adminId: string, data: any) {
     const banner = await this.prisma.banner.create({ data });
-    
+
     await this.cacheService.del('banners:public:active');
 
     await this.activityLogs.create({

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+  Query,
+} from '@nestjs/common';
 import { AutomationService } from './automation.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 
@@ -30,7 +39,9 @@ export class AutomationController {
 
   @Get('logs')
   async getLogs(@Query('limit') limit?: number) {
-    const logs = await this.automationService.getAutomationLogs(Number(limit) || 20);
+    const logs = await this.automationService.getAutomationLogs(
+      Number(limit) || 20,
+    );
     return {
       success: true,
       data: logs,

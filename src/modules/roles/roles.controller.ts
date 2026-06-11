@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { AdminAuthGuard } from '../auth/guards/admin-auth.guard';
 import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
@@ -52,7 +63,11 @@ export class RolesController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateRoleDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateRoleDto,
+    @Req() req: any,
+  ) {
     await this.checkSuperAdmin(req);
     const data = await this.rolesService.update(id, req.user.sub, dto);
     return successResponse('Role updated successfully', data);

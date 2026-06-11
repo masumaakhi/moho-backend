@@ -5,4 +5,3 @@ export class CheckAccountDto {
   @IsNotEmpty()
   contact!: string; // phone or email
 }
-

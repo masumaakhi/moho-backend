@@ -8,14 +8,20 @@ export class StorefrontService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
-  ) { }
+  ) {}
 
   async getHome() {
     const cacheKey = 'storefront:home';
     const cached = await this.cacheService.get<any>(cacheKey);
     if (cached) return cached;
 
-    const [heroSections, trendingProducts, featuredProducts, reviews, videoReviews] = await Promise.all([
+    const [
+      heroSections,
+      trendingProducts,
+      featuredProducts,
+      reviews,
+      videoReviews,
+    ] = await Promise.all([
       this.prisma.homepageSection.findMany({
         where: { is_active: true },
         orderBy: { sort_order: 'asc' },
@@ -23,22 +29,30 @@ export class StorefrontService {
       this.prisma.product.findMany({
         where: { status: 'active', is_trending: true, deleted_at: null },
         take: 8,
-        include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
+        include: {
+          images: true,
+          category: true,
+          reviews: { where: { status: 'approved' } },
+        },
       }),
       this.prisma.product.findMany({
         where: { status: 'active', is_featured: true, deleted_at: null },
         take: 8,
-        include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
+        include: {
+          images: true,
+          category: true,
+          reviews: { where: { status: 'approved' } },
+        },
       }),
       this.prisma.productReview.findMany({
         where: { status: 'approved' },
         take: 5,
-        include: { product: true, customer: true }
+        include: { product: true, customer: true },
       }),
       this.prisma.customerVideoReview.findMany({
         where: { is_active: true },
-        orderBy: { sort_order: 'asc' }
-      })
+        orderBy: { sort_order: 'asc' },
+      }),
     ]);
 
     const result = {
@@ -54,8 +68,19 @@ export class StorefrontService {
   }
 
   async getProducts(query: any) {
-    const { search, category, minPrice, maxPrice, sort, page = 1, limit = 12 } = query;
-    const where: Prisma.ProductWhereInput = { status: 'active', deleted_at: null };
+    const {
+      search,
+      category,
+      minPrice,
+      maxPrice,
+      sort,
+      page = 1,
+      limit = 12,
+    } = query;
+    const where: Prisma.ProductWhereInput = {
+      status: 'active',
+      deleted_at: null,
+    };
 
     if (search) {
       where.name = { contains: search, mode: 'insensitive' };
@@ -66,14 +91,22 @@ export class StorefrontService {
     }
 
     if (minPrice) {
-      where.new_price = { ...((where.new_price as any) || {}), gte: parseFloat(minPrice) };
+      where.new_price = {
+        ...((where.new_price as any) || {}),
+        gte: parseFloat(minPrice),
+      };
     }
 
     if (maxPrice) {
-      where.new_price = { ...((where.new_price as any) || {}), lte: parseFloat(maxPrice) };
+      where.new_price = {
+        ...((where.new_price as any) || {}),
+        lte: parseFloat(maxPrice),
+      };
     }
 
-    let orderBy: Prisma.ProductOrderByWithRelationInput = { created_at: 'desc' };
+    let orderBy: Prisma.ProductOrderByWithRelationInput = {
+      created_at: 'desc',
+    };
     if (sort === 'price_asc') orderBy = { new_price: 'asc' };
     else if (sort === 'price_desc') orderBy = { new_price: 'desc' };
 
@@ -85,9 +118,14 @@ export class StorefrontService {
         orderBy,
         skip,
         take: Number(limit),
-        include: { images: true, category: true, variants: true, reviews: { where: { status: 'approved' } } }
+        include: {
+          images: true,
+          category: true,
+          variants: true,
+          reviews: { where: { status: 'approved' } },
+        },
       }),
-      this.prisma.product.count({ where })
+      this.prisma.product.count({ where }),
     ]);
 
     return {
@@ -96,8 +134,8 @@ export class StorefrontService {
         total,
         page: Number(page),
         limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit))
-      }
+        totalPages: Math.ceil(total / Number(limit)),
+      },
     };
   }
 
@@ -110,9 +148,9 @@ export class StorefrontService {
         variants: true,
         faqs: true,
         reviews: {
-          where: { status: 'approved' }
-        }
-      }
+          where: { status: 'approved' },
+        },
+      },
     });
 
     if (!product) {
@@ -126,7 +164,7 @@ export class StorefrontService {
     return this.prisma.product.findMany({
       where: { status: 'active', is_trending: true, deleted_at: null },
       take: 10,
-      include: { images: true, category: true }
+      include: { images: true, category: true },
     });
   }
 
@@ -134,7 +172,7 @@ export class StorefrontService {
     return this.prisma.product.findMany({
       where: { status: 'active', is_featured: true, deleted_at: null },
       take: 10,
-      include: { images: true, category: true }
+      include: { images: true, category: true },
     });
   }
 
@@ -147,22 +185,28 @@ export class StorefrontService {
         status: 'active',
         deleted_at: null,
         category_id: product.category_id,
-        id: { not: id }
+        id: { not: id },
       },
       take: 4,
-      include: { images: true, category: true }
+      include: { images: true, category: true },
     });
   }
 
   async subscribeNewsletter(email: string) {
-    const existing = await this.prisma.newsletterSubscriber.findUnique({ where: { email } });
+    const existing = await this.prisma.newsletterSubscriber.findUnique({
+      where: { email },
+    });
     if (existing) {
       return { success: true, message: 'Already subscribed', existing: true };
     }
     await this.prisma.newsletterSubscriber.create({
-      data: { email }
+      data: { email },
     });
-    return { success: true, message: 'Subscribed successfully', existing: false };
+    return {
+      success: true,
+      message: 'Subscribed successfully',
+      existing: false,
+    };
   }
 
   async submitContact(data: any) {
@@ -171,8 +215,8 @@ export class StorefrontService {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        message: data.message
-      }
+        message: data.message,
+      },
     });
     return { success: true, message: 'Message sent successfully' };
   }

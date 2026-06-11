@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateVideoReviewDto, UpdateVideoReviewDto } from './dto/video-review.dto';
+import {
+  CreateVideoReviewDto,
+  UpdateVideoReviewDto,
+} from './dto/video-review.dto';
 
 @Injectable()
 export class CustomerVideoReviewsService {

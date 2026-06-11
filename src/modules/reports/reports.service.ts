@@ -6,16 +6,35 @@ import PDFDocument from 'pdfkit';
 import { Response } from 'express';
 
 const DEFAULT_PRICES = {
-  c100: 85, c200: 140, c400: 264, o100: 45, o200: 80, o400: 160,
-  s100: 15, s200: 30, p50: 15, p100: 30, p200: 60,
-  fee_p: 16.5, fee_w: 10, fee_d: 110, rate_usd: 135
+  c100: 85,
+  c200: 140,
+  c400: 264,
+  o100: 45,
+  o200: 80,
+  o400: 160,
+  s100: 15,
+  s200: 30,
+  p50: 15,
+  p100: 30,
+  p200: 60,
+  fee_p: 16.5,
+  fee_w: 10,
+  fee_d: 110,
+  rate_usd: 135,
 };
 
 const ITEM_NAMES: { [key: string]: string } = {
-  c100: "100ml Combo", c200: "200ml Combo", c400: "400ml Combo",
-  o100: "100ml Oil", o200: "200ml Oil", o400: "400ml Oil",
-  s100: "100ml Spray", s200: "200ml Spray",
-  p50: "50gm Pack", p100: "100gm Pack", p200: "200gm Pack"
+  c100: '100ml Combo',
+  c200: '200ml Combo',
+  c400: '400ml Combo',
+  o100: '100ml Oil',
+  o200: '200ml Oil',
+  o400: '400ml Oil',
+  s100: '100ml Spray',
+  s200: '200ml Spray',
+  p50: '50gm Pack',
+  p100: '100gm Pack',
+  p200: '200gm Pack',
 };
 
 @Injectable()
@@ -31,7 +50,7 @@ export class ReportsService {
 
   async getManualPrices() {
     const setting = await this.prisma.setting.findUnique({
-      where: { key: 'manual_report_prices' }
+      where: { key: 'manual_report_prices' },
     });
 
     if (!setting) {
@@ -40,8 +59,8 @@ export class ReportsService {
         data: {
           key: 'manual_report_prices',
           value: JSON.stringify(DEFAULT_PRICES),
-          group: 'general'
-        }
+          group: 'general',
+        },
       });
       return DEFAULT_PRICES;
     }
@@ -58,7 +77,11 @@ export class ReportsService {
     await this.prisma.setting.upsert({
       where: { key: 'manual_report_prices' },
       update: { value: JSON.stringify(pricesToSave) },
-      create: { key: 'manual_report_prices', value: JSON.stringify(pricesToSave), group: 'general' }
+      create: {
+        key: 'manual_report_prices',
+        value: JSON.stringify(pricesToSave),
+        group: 'general',
+      },
     });
 
     if (adminId) {
@@ -66,7 +89,7 @@ export class ReportsService {
         user_id: adminId,
         action: 'UPDATE_MANUAL_PRICES',
         entity_type: 'settings',
-        details: { prices: pricesToSave }
+        details: { prices: pricesToSave },
       });
     }
 
@@ -120,7 +143,9 @@ export class ReportsService {
     prodCost += customQty * customCost;
 
     const adTaka = adDollar * adRate;
-    const packagingCost = parcelsCount * (Number(prices.fee_p || 16.5) + Number(prices.fee_w || 10));
+    const packagingCost =
+      parcelsCount *
+      (Number(prices.fee_p || 16.5) + Number(prices.fee_w || 10));
     const totalProdCost = prodCost + packagingCost;
 
     const totalDel = parcelsCount * Number(prices.fee_d || 110);
@@ -153,7 +178,7 @@ export class ReportsService {
         custom_item_cost: customCost,
         total_prod_cost: totalProdCost,
         total_expenses: totalExpenses,
-        net_profit: netProfit
+        net_profit: netProfit,
       },
       create: {
         date,
@@ -178,8 +203,8 @@ export class ReportsService {
         custom_item_cost: customCost,
         total_prod_cost: totalProdCost,
         total_expenses: totalExpenses,
-        net_profit: netProfit
-      }
+        net_profit: netProfit,
+      },
     });
 
     if (adminId) {
@@ -187,7 +212,7 @@ export class ReportsService {
         user_id: adminId,
         action: 'SAVE_MANUAL_ENTRY',
         entity_type: 'manual_report',
-        details: { date: date.toISOString().split('T')[0], saleAmount }
+        details: { date: date.toISOString().split('T')[0], saleAmount },
       });
     }
 
@@ -195,23 +220,27 @@ export class ReportsService {
   }
 
   async getManualEntries(startDate?: string, endDate?: string) {
-    const start = startDate ? new Date(startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(new Date().setDate(new Date().getDate() - 30));
     const end = endDate ? new Date(endDate) : new Date();
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
 
     const data = await this.prisma.manualLedgerEntry.findMany({
       where: {
-        date: { gte: start, lte: end }
+        date: { gte: start, lte: end },
       },
-      orderBy: { date: 'desc' }
+      orderBy: { date: 'desc' },
     });
 
     return { success: true, data };
   }
 
   async deleteManualEntry(id: string, adminId?: string) {
-    const entry = await this.prisma.manualLedgerEntry.findUnique({ where: { id } });
+    const entry = await this.prisma.manualLedgerEntry.findUnique({
+      where: { id },
+    });
     if (!entry) throw new NotFoundException('Entry not found');
 
     await this.prisma.manualLedgerEntry.delete({ where: { id } });
@@ -221,7 +250,7 @@ export class ReportsService {
         user_id: adminId,
         action: 'DELETE_MANUAL_ENTRY',
         entity_type: 'manual_report',
-        details: { date: entry.date.toISOString().split('T')[0] }
+        details: { date: entry.date.toISOString().split('T')[0] },
       });
     }
 
@@ -233,7 +262,9 @@ export class ReportsService {
   // -------------------------------------------------------------
 
   async getReportSummary(startDate?: string, endDate?: string) {
-    const start = startDate ? new Date(startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(new Date().setDate(new Date().getDate() - 30));
     const end = endDate ? new Date(endDate) : new Date();
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
@@ -249,39 +280,57 @@ export class ReportsService {
         include: {
           order_items: {
             include: {
-              product: { select: { cost_price: true } }
-            }
-          }
-        }
+              product: { select: { cost_price: true } },
+            },
+          },
+        },
       }),
       this.prisma.deliveryBooking.findMany({
-        where: { created_at: { gte: start, lte: end } }
+        where: { created_at: { gte: start, lte: end } },
       }),
       this.prisma.businessExpense.findMany({
-        where: { date: { gte: start, lte: end } }
-      })
+        where: { date: { gte: start, lte: end } },
+      }),
     ]);
 
     const totalOrders = orders.length;
-    const deliveredOrders = orders.filter(o => o.order_status === 'delivered').length;
-    const cancelledOrders = orders.filter(o => o.order_status === 'cancelled').length;
-    const returnedOrders = orders.filter(o => o.order_status === 'returned').length;
+    const deliveredOrders = orders.filter(
+      (o) => o.order_status === 'delivered',
+    ).length;
+    const cancelledOrders = orders.filter(
+      (o) => o.order_status === 'cancelled',
+    ).length;
+    const returnedOrders = orders.filter(
+      (o) => o.order_status === 'returned',
+    ).length;
 
     const totalRevenue = orders
-      .filter(o => o.order_status === 'delivered' || o.order_status === 'shipped')
+      .filter(
+        (o) => o.order_status === 'delivered' || o.order_status === 'shipped',
+      )
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
     const deliveryCost = deliveryBookings.length * 60; // Standard 60 BDT cost per courier packaging book
 
     const productCost = orders
-      .filter(o => o.order_status === 'delivered' || o.order_status === 'shipped')
+      .filter(
+        (o) => o.order_status === 'delivered' || o.order_status === 'shipped',
+      )
       .reduce((sum, o) => {
-        return sum + o.order_items.reduce((itemSum, item) => {
-          return itemSum + (Number(item.product.cost_price || 0) * item.quantity);
-        }, 0);
+        return (
+          sum +
+          o.order_items.reduce((itemSum, item) => {
+            return (
+              itemSum + Number(item.product.cost_price || 0) * item.quantity
+            );
+          }, 0)
+        );
       }, 0);
 
-    const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalExpenses = expenses.reduce(
+      (sum, e) => sum + Number(e.amount),
+      0,
+    );
     const grossProfit = totalRevenue - productCost - deliveryCost;
     const netProfit = grossProfit - totalExpenses;
 
@@ -298,15 +347,17 @@ export class ReportsService {
           product_cost: productCost,
           total_expenses: totalExpenses,
           gross_profit: grossProfit,
-          net_profit: netProfit
+          net_profit: netProfit,
         },
-        period: { start, end }
-      }
+        period: { start, end },
+      },
     };
   }
 
   async getDailyReports(startDate?: string, endDate?: string) {
-    const start = startDate ? new Date(startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(new Date().setDate(new Date().getDate() - 30));
     const end = endDate ? new Date(endDate) : new Date();
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
@@ -338,8 +389,14 @@ export class ReportsService {
   // -------------------------------------------------------------
   // MULTI-VIEW REPORT SYSTEM CORE ENDPOINT
   // -------------------------------------------------------------
-  async getMultiViewReports(view: string, startDate?: string, endDate?: string) {
-    const start = startDate ? new Date(startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
+  async getMultiViewReports(
+    view: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(new Date().setDate(new Date().getDate() - 30));
     const end = endDate ? new Date(endDate) : new Date();
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
@@ -350,13 +407,16 @@ export class ReportsService {
     // 1. Fetch website order summary & daily list
     const [webSummaryRes, webDailyRes] = await Promise.all([
       this.getReportSummary(formattedStart, formattedEnd),
-      this.getDailyReports(formattedStart, formattedEnd)
+      this.getDailyReports(formattedStart, formattedEnd),
     ]);
     const websiteSummary = webSummaryRes.data.summary;
     const websiteDaily = webDailyRes.data;
 
     // 2. Fetch manual entry logs
-    const manualEntriesRes = await this.getManualEntries(formattedStart, formattedEnd);
+    const manualEntriesRes = await this.getManualEntries(
+      formattedStart,
+      formattedEnd,
+    );
     const manualDaily = manualEntriesRes.data;
 
     // 3. Compute manual summary
@@ -369,17 +429,25 @@ export class ReportsService {
       total_prod_cost: 0,
       total_expenses: 0,
       net_profit: 0,
-      c100_qty: 0, c200_qty: 0, c400_qty: 0,
-      o100_qty: 0, o200_qty: 0, o400_qty: 0,
-      s100_qty: 0, s200_qty: 0,
-      p50_qty: 0, p100_qty: 0, p200_qty: 0,
-      custom_qty: 0
+      c100_qty: 0,
+      c200_qty: 0,
+      c400_qty: 0,
+      o100_qty: 0,
+      o200_qty: 0,
+      o400_qty: 0,
+      s100_qty: 0,
+      s200_qty: 0,
+      p50_qty: 0,
+      p100_qty: 0,
+      p200_qty: 0,
+      custom_qty: 0,
     };
 
     manualDaily.forEach((entry: any) => {
       manualSummary.total_sales += Number(entry.sale_amount);
       manualSummary.total_ads_usd += Number(entry.ad_dollar);
-      manualSummary.total_ads_bdt += Number(entry.ad_dollar) * Number(entry.ad_rate);
+      manualSummary.total_ads_bdt +=
+        Number(entry.ad_dollar) * Number(entry.ad_rate);
       manualSummary.total_parcels += entry.parcels_count;
       manualSummary.total_returns += entry.returns_count;
       manualSummary.total_prod_cost += Number(entry.total_prod_cost);
@@ -403,14 +471,14 @@ export class ReportsService {
     if (view === 'website') {
       return {
         summary: websiteSummary,
-        daily: websiteDaily
+        daily: websiteDaily,
       };
     }
 
     if (view === 'manual') {
       return {
         summary: manualSummary,
-        daily: manualDaily
+        daily: manualDaily,
       };
     }
 
@@ -420,18 +488,29 @@ export class ReportsService {
       const pathaoBookings = await this.prisma.deliveryBooking.findMany({
         where: {
           courier_name: 'pathao',
-          created_at: { gte: start, lte: end }
+          created_at: { gte: start, lte: end },
         },
         include: {
-          order: true
-        }
+          order: true,
+        },
       });
 
       const totalBooked = pathaoBookings.length;
-      const successDeliveries = pathaoBookings.filter(b => b.delivery_status === 'delivered' || b.order.order_status === 'delivered');
-      const returnedBookings = pathaoBookings.filter(b => b.delivery_status === 'returned' || b.order.order_status === 'returned');
+      const successDeliveries = pathaoBookings.filter(
+        (b) =>
+          b.delivery_status === 'delivered' ||
+          b.order.order_status === 'delivered',
+      );
+      const returnedBookings = pathaoBookings.filter(
+        (b) =>
+          b.delivery_status === 'returned' ||
+          b.order.order_status === 'returned',
+      );
 
-      const totalCollected = successDeliveries.reduce((sum, b) => sum + Number(b.order.total_amount || 0), 0);
+      const totalCollected = successDeliveries.reduce(
+        (sum, b) => sum + Number(b.order.total_amount || 0),
+        0,
+      );
       // Pathao Packaging costs (using 110 fee_d standard, or booking_response delivery charge if available)
       const deliveryFee = totalBooked * 110;
       const returnPenalty = returnedBookings.length * 60; // 60 BDT returned parcels delivery loss
@@ -442,21 +521,24 @@ export class ReportsService {
           total_bookings: totalBooked,
           success_deliveries: successDeliveries.length,
           returned_deliveries: returnedBookings.length,
-          success_rate: totalBooked > 0 ? Math.round((successDeliveries.length / totalBooked) * 100) : 0,
+          success_rate:
+            totalBooked > 0
+              ? Math.round((successDeliveries.length / totalBooked) * 100)
+              : 0,
           total_collected: totalCollected,
           delivery_fees: deliveryFee,
           return_losses: returnPenalty,
-          net_payout: netPayout
+          net_payout: netPayout,
         },
-        bookings: pathaoBookings.map(b => ({
+        bookings: pathaoBookings.map((b) => ({
           consignment_id: b.consignment_id || b.tracking_id || 'Pending',
           order_number: b.order.order_number,
           customer_name: b.order.customer_name || 'Guest Customer',
           customer_phone: b.order.customer_phone || '-',
           amount: Number(b.order.total_amount || 0),
           status: b.delivery_status,
-          date: b.created_at.toISOString().split('T')[0]
-        }))
+          date: b.created_at.toISOString().split('T')[0],
+        })),
       };
     }
 
@@ -464,7 +546,7 @@ export class ReportsService {
       // 5. Compute Website vs Manual Reconciliation
       const dailyMap: { [key: string]: any } = {};
 
-      websiteDaily.forEach(day => {
+      websiteDaily.forEach((day) => {
         const date = day.date;
         dailyMap[date] = {
           date,
@@ -474,11 +556,11 @@ export class ReportsService {
           manual_parcels: 0,
           revenue_diff: -day.total_revenue,
           parcels_diff: -day.total_orders,
-          status: 'Discrepancy'
+          status: 'Discrepancy',
         };
       });
 
-      manualDaily.forEach(entry => {
+      manualDaily.forEach((entry) => {
         const date = entry.date.toISOString().split('T')[0];
         if (!dailyMap[date]) {
           dailyMap[date] = {
@@ -489,42 +571,58 @@ export class ReportsService {
             manual_parcels: entry.parcels_count,
             revenue_diff: Number(entry.sale_amount),
             parcels_diff: entry.parcels_count,
-            status: 'Discrepancy'
+            status: 'Discrepancy',
           };
         } else {
           dailyMap[date].manual_revenue = Number(entry.sale_amount);
           dailyMap[date].manual_parcels = entry.parcels_count;
-          dailyMap[date].revenue_diff = Number(entry.sale_amount) - dailyMap[date].website_revenue;
-          dailyMap[date].parcels_diff = entry.parcels_count - dailyMap[date].website_orders;
+          dailyMap[date].revenue_diff =
+            Number(entry.sale_amount) - dailyMap[date].website_revenue;
+          dailyMap[date].parcels_diff =
+            entry.parcels_count - dailyMap[date].website_orders;
         }
 
         const revMatch = Math.abs(dailyMap[date].revenue_diff) < 1; // within 1 BDT
         const orderMatch = dailyMap[date].parcels_diff === 0;
 
-        dailyMap[date].status = (revMatch && orderMatch) ? 'Reconciled' : 'Discrepancy';
+        dailyMap[date].status =
+          revMatch && orderMatch ? 'Reconciled' : 'Discrepancy';
       });
 
-      const auditLogs = Object.values(dailyMap).sort((a: any, b: any) => b.date.localeCompare(a.date));
+      const auditLogs = Object.values(dailyMap).sort((a: any, b: any) =>
+        b.date.localeCompare(a.date),
+      );
 
       return {
         summary: {
           total_days: auditLogs.length,
-          reconciled_days: auditLogs.filter((a: any) => a.status === 'Reconciled').length,
-          discrepancy_days: auditLogs.filter((a: any) => a.status === 'Discrepancy').length
+          reconciled_days: auditLogs.filter(
+            (a: any) => a.status === 'Reconciled',
+          ).length,
+          discrepancy_days: auditLogs.filter(
+            (a: any) => a.status === 'Discrepancy',
+          ).length,
         },
-        logs: auditLogs
+        logs: auditLogs,
       };
     }
 
     // Default: view === 'combined'
-    const totalCombinedRevenue = websiteSummary.total_revenue + manualSummary.total_sales;
-    const totalCombinedAds = manualSummary.total_ads_bdt + websiteSummary.total_expenses; // Web business expenses count as advertising/ad spend mostly
-    const totalCombinedExpenses = websiteSummary.product_cost + manualSummary.total_prod_cost + websiteSummary.delivery_cost + manualSummary.total_expenses;
-    const combinedNetProfit = totalCombinedRevenue - totalCombinedAds - totalCombinedExpenses;
+    const totalCombinedRevenue =
+      websiteSummary.total_revenue + manualSummary.total_sales;
+    const totalCombinedAds =
+      manualSummary.total_ads_bdt + websiteSummary.total_expenses; // Web business expenses count as advertising/ad spend mostly
+    const totalCombinedExpenses =
+      websiteSummary.product_cost +
+      manualSummary.total_prod_cost +
+      websiteSummary.delivery_cost +
+      manualSummary.total_expenses;
+    const combinedNetProfit =
+      totalCombinedRevenue - totalCombinedAds - totalCombinedExpenses;
 
     // Combine day logs
     const dayMap: { [key: string]: any } = {};
-    websiteDaily.forEach(day => {
+    websiteDaily.forEach((day) => {
       dayMap[day.date] = {
         date: day.date,
         web_sales: day.total_revenue,
@@ -532,11 +630,11 @@ export class ReportsService {
         combined_sales: day.total_revenue,
         web_profit: day.net_profit,
         manual_profit: 0,
-        combined_profit: day.net_profit
+        combined_profit: day.net_profit,
       };
     });
 
-    manualDaily.forEach(entry => {
+    manualDaily.forEach((entry) => {
       const date = entry.date.toISOString().split('T')[0];
       if (!dayMap[date]) {
         dayMap[date] = {
@@ -546,7 +644,7 @@ export class ReportsService {
           combined_sales: Number(entry.sale_amount),
           web_profit: 0,
           manual_profit: Number(entry.net_profit),
-          combined_profit: Number(entry.net_profit)
+          combined_profit: Number(entry.net_profit),
         };
       } else {
         dayMap[date].manual_sales = Number(entry.sale_amount);
@@ -556,18 +654,21 @@ export class ReportsService {
       }
     });
 
-    const combinedDaily = Object.values(dayMap).sort((a: any, b: any) => b.date.localeCompare(a.date));
+    const combinedDaily = Object.values(dayMap).sort((a: any, b: any) =>
+      b.date.localeCompare(a.date),
+    );
 
     return {
       summary: {
         combined_revenue: totalCombinedRevenue,
         combined_ads: totalCombinedAds,
-        combined_orders: websiteSummary.total_orders + manualSummary.total_parcels,
+        combined_orders:
+          websiteSummary.total_orders + manualSummary.total_parcels,
         combined_profit: combinedNetProfit,
         web_revenue: websiteSummary.total_revenue,
-        manual_revenue: manualSummary.total_sales
+        manual_revenue: manualSummary.total_sales,
       },
-      daily: combinedDaily
+      daily: combinedDaily,
     };
   }
 
@@ -575,8 +676,18 @@ export class ReportsService {
   // 4. ADVANCED EXPORT SYSTEMS (EXCEL & PDF COMPLIANCE)
   // -------------------------------------------------------------
 
-  async exportToExcel(res: Response, startDate?: string, endDate?: string, adminId?: string, view = 'combined') {
-    const reportData = (await this.getMultiViewReports(view, startDate, endDate)) as any;
+  async exportToExcel(
+    res: Response,
+    startDate?: string,
+    endDate?: string,
+    adminId?: string,
+    view = 'combined',
+  ) {
+    const reportData = (await this.getMultiViewReports(
+      view,
+      startDate,
+      endDate,
+    )) as any;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(`${view.toUpperCase()} Report`);
 
@@ -605,8 +716,14 @@ export class ReportsService {
         { metric: 'Total Sales Entered', value: `৳ ${summary.total_sales}` },
         { metric: 'Ad Cost (USD)', value: `$${summary.total_ads_usd}` },
         { metric: 'Ad Cost (BDT)', value: `৳ ${summary.total_ads_bdt}` },
-        { metric: 'Parcels Packaging Fee', value: `৳ ${summary.total_prod_cost}` },
-        { metric: 'Estimated Handled Profit', value: `৳ ${summary.net_profit}` },
+        {
+          metric: 'Parcels Packaging Fee',
+          value: `৳ ${summary.total_prod_cost}`,
+        },
+        {
+          metric: 'Estimated Handled Profit',
+          value: `৳ ${summary.net_profit}`,
+        },
       ]);
     } else if (view === 'pathao') {
       const summary = reportData.summary;
@@ -619,9 +736,18 @@ export class ReportsService {
         { metric: 'Successful Deliveries', value: summary.success_deliveries },
         { metric: 'Returned Shipments', value: summary.returned_deliveries },
         { metric: 'Success Rate (%)', value: `${summary.success_rate}%` },
-        { metric: 'Total COD Collected', value: `৳ ${summary.total_collected}` },
-        { metric: 'Courier Delivery Fees', value: `৳ ${summary.delivery_fees}` },
-        { metric: 'Returned Penalty Loss', value: `৳ ${summary.return_losses}` },
+        {
+          metric: 'Total COD Collected',
+          value: `৳ ${summary.total_collected}`,
+        },
+        {
+          metric: 'Courier Delivery Fees',
+          value: `৳ ${summary.delivery_fees}`,
+        },
+        {
+          metric: 'Returned Penalty Loss',
+          value: `৳ ${summary.return_losses}`,
+        },
         { metric: 'Fulfillment Net Payout', value: `৳ ${summary.net_payout}` },
       ]);
     } else if (view === 'reconciliation') {
@@ -643,17 +769,35 @@ export class ReportsService {
         { header: 'Value', key: 'value', width: 25 },
       ];
       worksheet.addRows([
-        { metric: 'Unified Business Sales', value: `৳ ${summary.combined_revenue}` },
+        {
+          metric: 'Unified Business Sales',
+          value: `৳ ${summary.combined_revenue}`,
+        },
         { metric: 'Combined Ad Spend', value: `৳ ${summary.combined_ads}` },
         { metric: 'Total Handled Orders', value: summary.combined_orders },
-        { metric: 'Consolidated Net Profit', value: `৳ ${summary.combined_profit}` },
-        { metric: 'Website Checkout Portion', value: `৳ ${summary.web_revenue}` },
-        { metric: 'Manual Entries Portion', value: `৳ ${summary.manual_revenue}` },
+        {
+          metric: 'Consolidated Net Profit',
+          value: `৳ ${summary.combined_profit}`,
+        },
+        {
+          metric: 'Website Checkout Portion',
+          value: `৳ ${summary.web_revenue}`,
+        },
+        {
+          metric: 'Manual Entries Portion',
+          value: `৳ ${summary.manual_revenue}`,
+        },
       ]);
     }
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=mohul_${view}_report.xlsx`);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=mohul_${view}_report.xlsx`,
+    );
     await workbook.xlsx.write(res);
     res.end();
 
@@ -663,31 +807,55 @@ export class ReportsService {
           admin_id: adminId,
           type: `excel_${view}`,
           file_url: 'internal_download',
-          date_range: `${startDate || 'all'}_to_${endDate || 'now'}`
-        }
+          date_range: `${startDate || 'all'}_to_${endDate || 'now'}`,
+        },
       });
       await this.activityLog.create({
         user_id: adminId,
         action: 'EXPORT_REPORT_EXCEL',
         entity_type: 'report',
-        details: { view, startDate, endDate }
+        details: { view, startDate, endDate },
       });
     }
   }
 
-  async exportToPdf(res: Response, startDate?: string, endDate?: string, adminId?: string, view = 'combined') {
-    const reportData = (await this.getMultiViewReports(view, startDate, endDate)) as any;
+  async exportToPdf(
+    res: Response,
+    startDate?: string,
+    endDate?: string,
+    adminId?: string,
+    view = 'combined',
+  ) {
+    const reportData = (await this.getMultiViewReports(
+      view,
+      startDate,
+      endDate,
+    )) as any;
     const doc = new (PDFDocument as any)();
-    
+
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=mohul_${view}_report.pdf`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=mohul_${view}_report.pdf`,
+    );
     doc.pipe(res);
 
     // PDF Stylings
-    doc.fontSize(22).fillColor('#146C4A').text('Mohul BI Financial Ledger', { align: 'center' });
+    doc
+      .fontSize(22)
+      .fillColor('#146C4A')
+      .text('Mohul BI Financial Ledger', { align: 'center' });
     doc.moveDown(0.2);
-    doc.fontSize(12).fillColor('#6B7280').text(`View Channel: ${view.toUpperCase()}`, { align: 'center' });
-    doc.fontSize(10).fillColor('#9CA3AF').text(`Reporting Dates: ${startDate || 'Start'} to ${endDate || 'Now'}`, { align: 'center' });
+    doc
+      .fontSize(12)
+      .fillColor('#6B7280')
+      .text(`View Channel: ${view.toUpperCase()}`, { align: 'center' });
+    doc
+      .fontSize(10)
+      .fillColor('#9CA3AF')
+      .text(`Reporting Dates: ${startDate || 'Start'} to ${endDate || 'Now'}`, {
+        align: 'center',
+      });
     doc.moveDown(2);
 
     let metrics: string[][] = [];
@@ -744,14 +912,23 @@ export class ReportsService {
     }
 
     metrics.forEach(([label, value]) => {
-      doc.fontSize(11).fillColor('#374151').text(`${label}: `, { continued: true });
+      doc
+        .fontSize(11)
+        .fillColor('#374151')
+        .text(`${label}: `, { continued: true });
       doc.fontSize(12).fillColor('#111827').font('Helvetica-Bold').text(value);
       doc.moveDown(0.6);
       doc.font('Helvetica');
     });
 
     doc.moveDown(2);
-    doc.fontSize(8).fillColor('#9CA3AF').text('Generated automatically by Mohul Business Intelligence platform.', { align: 'center' });
+    doc
+      .fontSize(8)
+      .fillColor('#9CA3AF')
+      .text(
+        'Generated automatically by Mohul Business Intelligence platform.',
+        { align: 'center' },
+      );
     doc.end();
 
     if (adminId) {
@@ -760,14 +937,14 @@ export class ReportsService {
           admin_id: adminId,
           type: `pdf_${view}`,
           file_url: 'internal_download',
-          date_range: `${startDate || 'all'}_to_${endDate || 'now'}`
-        }
+          date_range: `${startDate || 'all'}_to_${endDate || 'now'}`,
+        },
       });
       await this.activityLog.create({
         user_id: adminId,
         action: 'EXPORT_REPORT_PDF',
         entity_type: 'report',
-        details: { view, startDate, endDate }
+        details: { view, startDate, endDate },
       });
     }
   }
@@ -776,8 +953,21 @@ export class ReportsService {
     return {
       success: true,
       data: {
-        order_statuses: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'returned'],
-        expense_categories: ['marketing', 'salary', 'rent', 'utilities', 'other'],
+        order_statuses: [
+          'pending',
+          'confirmed',
+          'shipped',
+          'delivered',
+          'cancelled',
+          'returned',
+        ],
+        expense_categories: [
+          'marketing',
+          'salary',
+          'rent',
+          'utilities',
+          'other',
+        ],
       },
     };
   }
