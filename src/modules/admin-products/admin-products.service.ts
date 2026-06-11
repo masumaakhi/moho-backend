@@ -80,7 +80,15 @@ export class AdminProductsService {
       throw new BadRequestException('Category required or does not exist');
     }
 
-    // 2. Slug generation
+    // 2. SKU duplicate check
+    if (dto.sku) {
+      const skuExists = await this.prisma.product.findUnique({ where: { sku: dto.sku } });
+      if (skuExists) {
+        throw new BadRequestException(`Product with SKU "${dto.sku}" already exists`);
+      }
+    }
+
+    // 3. Slug generation
     const slug = dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now();
 
     const product = await this.prisma.product.create({
@@ -150,23 +158,78 @@ export class AdminProductsService {
       if (!catExists) throw new BadRequestException('Category not found');
     }
 
+    if (dto.sku) {
+      const skuExists = await this.prisma.product.findFirst({
+        where: {
+          sku: dto.sku,
+          id: { not: id }
+        }
+      });
+      if (skuExists) {
+        throw new BadRequestException(`Product with SKU "${dto.sku}" already exists`);
+      }
+    }
+
+    // Prepare transaction operations for updating relations
+    const deleteOps: any[] = [];
+    const createData: any = {
+      name: dto.name,
+      sku: dto.sku,
+      category_id: dto.category_id,
+      short_description: dto.short_description,
+      description: dto.description,
+      how_to_use: dto.how_to_use,
+      base_price: dto.base_price,
+      new_price: dto.new_price,
+      stock_quantity: dto.stock_quantity,
+      status: dto.status,
+      is_featured: dto.is_featured,
+      is_trending: dto.is_trending,
+      is_free_delivery: dto.is_free_delivery,
+    };
+
+    if (dto.images !== undefined) {
+      deleteOps.push(this.prisma.productImage.deleteMany({ where: { product_id: id } }));
+      createData.images = {
+        create: dto.images.map((img, index) => ({
+          image_url: img.image_url,
+          alt_text: img.alt_text,
+          sort_order: index
+        }))
+      };
+    }
+
+    if (dto.variants !== undefined) {
+      deleteOps.push(this.prisma.productVariant.deleteMany({ where: { product_id: id } }));
+      createData.variants = {
+        create: dto.variants.map(v => ({
+          name: v.name,
+          value: v.value,
+          sku: v.sku,
+          price: v.price,
+          stock: v.stock || 0
+        }))
+      };
+    }
+
+    if (dto.faqs !== undefined) {
+      deleteOps.push(this.prisma.productFAQ.deleteMany({ where: { product_id: id } }));
+      createData.faqs = {
+        create: dto.faqs.map(f => ({
+          question: f.question,
+          answer: f.answer
+        }))
+      };
+    }
+
+    // Execute deletes in a transaction first
+    if (deleteOps.length > 0) {
+      await this.prisma.$transaction(deleteOps);
+    }
+
     const updated = await this.prisma.product.update({
       where: { id },
-      data: {
-        name: dto.name,
-        sku: dto.sku,
-        category_id: dto.category_id,
-        short_description: dto.short_description,
-        description: dto.description,
-        how_to_use: dto.how_to_use,
-        base_price: dto.base_price,
-        new_price: dto.new_price,
-        stock_quantity: dto.stock_quantity,
-        status: dto.status,
-        is_featured: dto.is_featured,
-        is_trending: dto.is_trending,
-        is_free_delivery: dto.is_free_delivery,
-      }
+      data: createData
     });
 
     // Low stock notification
@@ -216,6 +279,37 @@ export class AdminProductsService {
     });
 
     return { success: true, message: 'Product deleted' };
+  }
+
+  async deleteProductsBulk(ids: string[], adminUserId: string) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No product IDs provided');
+    }
+
+    // Soft delete products in bulk
+    await this.prisma.product.updateMany({
+      where: {
+        id: { in: ids },
+        deleted_at: null
+      },
+      data: {
+        deleted_at: new Date(),
+        status: 'inactive'
+      }
+    });
+
+    // Create activity log
+    await this.activityLogs.create({
+      actor_type: 'admin',
+      user_id: adminUserId,
+      module_name: 'product',
+      action: 'delete_products_bulk',
+      entity_type: 'product',
+      description: `Bulk deleted ${ids.length} products`,
+      details: { count: ids.length, ids }
+    });
+
+    return { success: true, message: `${ids.length} products deleted` };
   }
 
   async getCategories() {

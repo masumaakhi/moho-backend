@@ -17,7 +17,7 @@ export class PrismaService
     if (dbUrl) {
       try {
         const urlObj = new URL(dbUrl);
-        urlObj.searchParams.set('connection_limit', '30'); // Increase connection limit to 30 to support concurrency
+        urlObj.searchParams.set('connection_limit', '5'); // Reduce to 5 to prevent connection exhaustion during dev hot-reloads
         urlObj.searchParams.set('pool_timeout', '20'); // Timeout faster internally to trigger retries
         urlObj.searchParams.set('connect_timeout', '20');
         dbUrl = urlObj.toString();

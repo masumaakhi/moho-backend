@@ -53,4 +53,10 @@ export class AdminProductsController {
     const adminUserId = req?.user?.id || '00000000-0000-0000-0000-000000000000';
     return this.productsService.deleteProduct(id, adminUserId);
   }
+
+  @Post('products/bulk-delete')
+  deleteProductsBulk(@Body('ids') ids: string[], @Req() req: any) {
+    const adminUserId = req?.user?.id || '00000000-0000-0000-0000-000000000000';
+    return this.productsService.deleteProductsBulk(ids, adminUserId);
+  }
 }

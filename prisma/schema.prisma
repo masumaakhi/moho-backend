@@ -58,6 +58,8 @@ model Customer {
   orders               Order[]
   product_reviews      ProductReview[]
 
+  @@index([phone])
+  @@index([email])
   @@map("customers")
 }
 
@@ -193,6 +195,7 @@ model Order {
   auto_account_created    Boolean               @default(false)
   account_created_user_id String?               @db.Uuid
   order_source_type       String?
+  response                String?               @default("Default")
   created_at              DateTime              @default(now())
   updated_at              DateTime              @updatedAt
   deleted_at              DateTime?
@@ -210,6 +213,10 @@ model Order {
 
   @@index([user_id])
   @@index([customer_id])
+  @@index([customer_phone])
+  @@index([customer_email])
+  @@index([order_status])
+  @@index([created_at])
   @@map("orders")
 }
 
@@ -259,6 +266,11 @@ model Product {
   variants          ProductVariant[]
   category          Category         @relation(fields: [category_id], references: [id])
 
+  @@index([category_id])
+  @@index([status, deleted_at])
+  @@index([is_featured, status, deleted_at])
+  @@index([is_trending, status, deleted_at])
+  @@index([created_at])
   @@map("products")
 }
 
@@ -291,39 +303,39 @@ model DailyReport {
 }
 
 model ManualLedgerEntry {
-  id                String   @id @default(uuid()) @db.Uuid
-  date              DateTime @unique
-  sale_amount       Decimal  @db.Decimal(12, 2)
-  ad_dollar         Decimal  @db.Decimal(12, 2)
-  ad_rate           Decimal  @default(135) @db.Decimal(12, 2)
-  parcels_count     Int      @default(0)
-  returns_count     Int      @default(0)
-  
+  id            String   @id @default(uuid()) @db.Uuid
+  date          DateTime @unique
+  sale_amount   Decimal  @db.Decimal(12, 2)
+  ad_dollar     Decimal  @db.Decimal(12, 2)
+  ad_rate       Decimal  @default(135) @db.Decimal(12, 2)
+  parcels_count Int      @default(0)
+  returns_count Int      @default(0)
+
   // Product Quantities
-  c100_qty          Int      @default(0)
-  c200_qty          Int      @default(0)
-  c400_qty          Int      @default(0)
-  o100_qty          Int      @default(0)
-  o200_qty          Int      @default(0)
-  o400_qty          Int      @default(0)
-  s100_qty          Int      @default(0)
-  s200_qty          Int      @default(0)
-  p50_qty           Int      @default(0)
-  p100_qty          Int      @default(0)
-  p200_qty          Int      @default(0)
-  
+  c100_qty Int @default(0)
+  c200_qty Int @default(0)
+  c400_qty Int @default(0)
+  o100_qty Int @default(0)
+  o200_qty Int @default(0)
+  o400_qty Int @default(0)
+  s100_qty Int @default(0)
+  s200_qty Int @default(0)
+  p50_qty  Int @default(0)
+  p100_qty Int @default(0)
+  p200_qty Int @default(0)
+
   // Custom Ad-hoc Item
-  custom_item_name  String?
-  custom_item_qty   Int      @default(0)
-  custom_item_cost  Decimal  @default(0) @db.Decimal(12, 2)
-  
+  custom_item_name String?
+  custom_item_qty  Int     @default(0)
+  custom_item_cost Decimal @default(0) @db.Decimal(12, 2)
+
   // Calculated Totals
-  total_prod_cost   Decimal  @db.Decimal(12, 2)
-  total_expenses    Decimal  @db.Decimal(12, 2)
-  net_profit        Decimal  @db.Decimal(12, 2)
-  
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  total_prod_cost Decimal @db.Decimal(12, 2)
+  total_expenses  Decimal @db.Decimal(12, 2)
+  net_profit      Decimal @db.Decimal(12, 2)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   @@map("manual_ledger_entries")
 }
@@ -350,6 +362,7 @@ model ProductImage {
   updated_at DateTime @updatedAt
   product    Product  @relation(fields: [product_id], references: [id])
 
+  @@index([product_id])
   @@map("product_images")
 }
 
@@ -366,6 +379,7 @@ model ProductVariant {
   cart_items CartItem[]
   product    Product    @relation(fields: [product_id], references: [id])
 
+  @@index([product_id])
   @@map("product_variants")
 }
 
@@ -378,6 +392,7 @@ model ProductFAQ {
   updated_at DateTime @updatedAt
   product    Product  @relation(fields: [product_id], references: [id])
 
+  @@index([product_id])
   @@map("product_faqs")
 }
 
@@ -395,6 +410,9 @@ model ProductReview {
   product     Product   @relation(fields: [product_id], references: [id])
   user        User?     @relation(fields: [user_id], references: [id])
 
+  @@index([product_id])
+  @@index([customer_id])
+  @@index([status])
   @@map("product_reviews")
 }
 
@@ -490,6 +508,8 @@ model CartItem {
   product    Product         @relation(fields: [product_id], references: [id])
   variant    ProductVariant? @relation(fields: [variant_id], references: [id])
 
+  @@index([cart_id])
+  @@index([product_id])
   @@map("cart_items")
 }
 
@@ -507,6 +527,8 @@ model OrderItem {
   order        Order    @relation(fields: [order_id], references: [id])
   product      Product  @relation(fields: [product_id], references: [id])
 
+  @@index([order_id])
+  @@index([product_id])
   @@map("order_items")
 }
 
@@ -521,6 +543,7 @@ model Payment {
   updated_at DateTime @updatedAt
   order      Order    @relation(fields: [order_id], references: [id])
 
+  @@index([order_id])
   @@map("payments")
 }
 

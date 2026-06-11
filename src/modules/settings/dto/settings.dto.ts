@@ -16,6 +16,10 @@ export class UpdateGeneralSettingsDto {
   @IsString()
   @IsOptional()
   business_logo?: string;
+
+  @IsString()
+  @IsOptional()
+  manual_report_prices?: string;
 }
 
 export class UpdateDeliverySettingsDto {

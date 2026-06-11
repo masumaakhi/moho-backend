@@ -9,11 +9,24 @@ export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    let user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { customer: true },
     });
     if (!user || user.deleted_at) throw new NotFoundException('User not found');
+
+    let customer = user.customer;
+    if (!customer) {
+      customer = await this.prisma.customer.create({
+        data: {
+          user_id: userId,
+          name: user.name || 'Unnamed',
+          email: user.email,
+          phone: user.phone,
+          source_type: 'auto_recovery'
+        }
+      });
+    }
 
     return successResponse('Profile fetched successfully', {
       id: user.id,
@@ -22,15 +35,15 @@ export class CustomersService {
       phone: user.phone,
       account_type: user.account_type,
       is_password_set: user.is_password_set,
-      customer: user.customer ? {
-        id: user.customer.id,
-        source_type: user.customer.source_type,
-        account_completed_at: user.customer.account_completed_at,
-        first_order_id: user.customer.first_order_id,
-        address: user.customer.address,
-        mohul_cash: user.customer.mohul_cash,
-        total_orders: user.customer.total_orders,
-        total_spend: user.customer.total_spend,
+      customer: customer ? {
+        id: customer.id,
+        source_type: customer.source_type,
+        account_completed_at: customer.account_completed_at,
+        first_order_id: customer.first_order_id,
+        address: customer.address,
+        mohul_cash: customer.mohul_cash,
+        total_orders: customer.total_orders,
+        total_spend: customer.total_spend,
       } : null,
     });
   }
@@ -175,6 +188,25 @@ export class CustomersService {
           where: { id: { in: unlinkedOrders.map(o => o.id) } },
           data: { customer_id: user.customer.id, user_id: user.id },
         });
+
+        // Sync customer stats
+        const stats = await this.prisma.order.aggregate({
+          where: {
+            customer_id: user.customer.id,
+            deleted_at: null,
+            order_status: { notIn: ['cancelled', 'returned'] }
+          },
+          _count: { id: true },
+          _sum: { total_amount: true }
+        });
+
+        await this.prisma.customer.update({
+          where: { id: user.customer.id },
+          data: {
+            total_orders: stats._count.id || 0,
+            total_spend: stats._sum.total_amount || 0
+          }
+        });
       }
     }
 
@@ -305,8 +337,20 @@ export class CustomersService {
   }
 
   private async getCustomerByUserId(userId: string) {
-    const customer = await this.prisma.customer.findFirst({ where: { user_id: userId } });
-    if (!customer) throw new NotFoundException('Customer record not found');
+    let customer = await this.prisma.customer.findFirst({ where: { user_id: userId } });
+    if (!customer) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+      customer = await this.prisma.customer.create({
+        data: {
+          user_id: userId,
+          name: user.name || 'Unnamed',
+          email: user.email,
+          phone: user.phone,
+          source_type: 'auto_recovery'
+        }
+      });
+    }
     return customer;
   }
 }

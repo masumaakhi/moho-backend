@@ -18,8 +18,8 @@ export class AutomationProcessor extends WorkerHost {
   ) {
     super();
     this.transporter = nodemailer.createTransport({
-      host: 'smtp-brevo.com',
-      port: 587,
+      host: this.config.get<string>('SMTP_HOST') || 'smtp-brevo.com',
+      port: Number(this.config.get<string>('SMTP_PORT')) || 587,
       auth: {
         user: this.config.get('SMTP_USER'),
         pass: this.config.get('SMTP_PASS'),

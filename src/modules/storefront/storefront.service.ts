@@ -1,47 +1,56 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
+import { CacheService } from '../../database/cache.service';
 
 @Injectable()
 export class StorefrontService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: CacheService,
+  ) { }
 
   async getHome() {
-    const heroSections = await this.prisma.homepageSection.findMany({
-      where: { is_active: true },
-      orderBy: { sort_order: 'asc' },
-    });
+    const cacheKey = 'storefront:home';
+    const cached = await this.cacheService.get<any>(cacheKey);
+    if (cached) return cached;
 
-    const trendingProducts = await this.prisma.product.findMany({
-      where: { status: 'active', is_trending: true, deleted_at: null },
-      take: 8,
-      include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
-    });
+    const [heroSections, trendingProducts, featuredProducts, reviews, videoReviews] = await Promise.all([
+      this.prisma.homepageSection.findMany({
+        where: { is_active: true },
+        orderBy: { sort_order: 'asc' },
+      }),
+      this.prisma.product.findMany({
+        where: { status: 'active', is_trending: true, deleted_at: null },
+        take: 8,
+        include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
+      }),
+      this.prisma.product.findMany({
+        where: { status: 'active', is_featured: true, deleted_at: null },
+        take: 8,
+        include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
+      }),
+      this.prisma.productReview.findMany({
+        where: { status: 'approved' },
+        take: 5,
+        include: { product: true, customer: true }
+      }),
+      this.prisma.customerVideoReview.findMany({
+        where: { is_active: true },
+        orderBy: { sort_order: 'asc' }
+      })
+    ]);
 
-    const featuredProducts = await this.prisma.product.findMany({
-      where: { status: 'active', is_featured: true, deleted_at: null },
-      take: 8,
-      include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
-    });
-
-    const reviews = await this.prisma.productReview.findMany({
-      where: { status: 'approved' },
-      take: 5,
-      include: { product: true, customer: true }
-    });
-
-    const videoReviews = await this.prisma.customerVideoReview.findMany({
-      where: { is_active: true },
-      orderBy: { sort_order: 'asc' }
-    });
-
-    return {
+    const result = {
       heroSections,
       trendingProducts,
       featuredProducts,
       reviews,
       videoReviews,
     };
+
+    await this.cacheService.set(cacheKey, result, 300); // cache for 5 minutes
+    return result;
   }
 
   async getProducts(query: any) {
@@ -76,7 +85,7 @@ export class StorefrontService {
         orderBy,
         skip,
         take: Number(limit),
-        include: { images: true, category: true, reviews: { where: { status: 'approved' } } }
+        include: { images: true, category: true, variants: true, reviews: { where: { status: 'approved' } } }
       }),
       this.prisma.product.count({ where })
     ]);

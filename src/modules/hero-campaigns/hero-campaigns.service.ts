@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { CacheService } from '../../database/cache.service';
 
 @Injectable()
 export class HeroCampaignsService {
   constructor(
     private prisma: PrismaService,
     private activityLogs: ActivityLogsService,
+    private cacheService: CacheService,
   ) {}
 
   async findAll(query: any) {
@@ -35,15 +37,24 @@ export class HeroCampaignsService {
   }
 
   async findPublic() {
-    return this.prisma.heroCampaign.findMany({
+    const cacheKey = 'campaigns:public:active';
+    const cached = await this.cacheService.get<any>(cacheKey);
+    if (cached) return cached;
+
+    const result = await this.prisma.heroCampaign.findMany({
       where: { is_active: true },
       orderBy: { sort_order: 'asc' },
     });
+
+    await this.cacheService.set(cacheKey, result, 600); // cache for 10 minutes
+    return result;
   }
 
   async create(adminId: string, data: any) {
     const campaign = await this.prisma.heroCampaign.create({ data });
     
+    await this.cacheService.del('campaigns:public:active');
+
     await this.activityLogs.create({
       actor_type: 'admin',
       user_id: adminId,
@@ -63,6 +74,8 @@ export class HeroCampaignsService {
       data,
     });
 
+    await this.cacheService.del('campaigns:public:active');
+
     await this.activityLogs.create({
       actor_type: 'admin',
       user_id: adminId,
@@ -78,6 +91,8 @@ export class HeroCampaignsService {
 
   async remove(adminId: string, id: string) {
     const campaign = await this.prisma.heroCampaign.delete({ where: { id } });
+
+    await this.cacheService.del('campaigns:public:active');
 
     await this.activityLogs.create({
       actor_type: 'admin',

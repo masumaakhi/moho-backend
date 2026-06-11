@@ -310,13 +310,7 @@ export class OrdersService {
 
     // Update Customer stats
     if (customerId) {
-      await this.prisma.customer.update({
-        where: { id: customerId },
-        data: {
-          total_orders: { increment: 1 },
-          total_spend: { increment: summary.total_amount }
-        }
-      });
+      await this.syncCustomerStats(this.prisma, customerId);
     }
 
     // Update cart
@@ -554,17 +548,21 @@ export class OrdersService {
         }
       }
 
-      // Customer stats update on delivery
-      if (status === 'delivered' && oldStatus !== 'delivered' && order.customer_id) {
-        await tx.customer.update({
-          where: { id: order.customer_id },
-          data: {
-            total_spend: { increment: order.total_amount || 0 },
-            account_completed_at: new Date() // Mark as active customer
-          }
-        });
+      // Customer stats update on status change
+      if (order.customer_id) {
+        await this.syncCustomerStats(tx, order.customer_id);
+        if (status === 'delivered' && oldStatus !== 'delivered') {
+          await tx.customer.update({
+            where: { id: order.customer_id },
+            data: {
+              account_completed_at: new Date() // Mark as active customer
+            }
+          });
+        }
+      }
 
-        // Update Daily Report Analytics
+      // Update Daily Report Analytics
+      if (status === 'delivered' && oldStatus !== 'delivered') {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -747,6 +745,26 @@ export class OrdersService {
       action: 'EXPORT_ORDERS',
       entity_type: 'order',
       details: { count: orders.length, filters },
+    });
+  }
+
+  private async syncCustomerStats(tx: any, customerId: string) {
+    const stats = await tx.order.aggregate({
+      where: {
+        customer_id: customerId,
+        deleted_at: null,
+        order_status: { notIn: ['cancelled', 'returned'] }
+      },
+      _count: { id: true },
+      _sum: { total_amount: true }
+    });
+
+    await tx.customer.update({
+      where: { id: customerId },
+      data: {
+        total_orders: stats._count.id || 0,
+        total_spend: stats._sum.total_amount || 0
+      }
     });
   }
 }

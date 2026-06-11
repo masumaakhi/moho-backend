@@ -50,4 +50,10 @@ export class AdminCustomersController {
     const adminId = req.user.sub;
     return this.customersService.toggleBlock(id, adminId);
   }
+
+  @Post('bulk-block')
+  bulkBlock(@Body('ids') ids: string[], @Req() req: any) {
+    const adminId = req.user.sub;
+    return this.customersService.bulkBlock(ids, adminId);
+  }
 }

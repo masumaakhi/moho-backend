@@ -265,6 +265,42 @@ export class AdminCustomersService {
     };
   }
 
+  async bulkBlock(ids: string[], adminId: string) {
+    if (!ids || ids.length === 0) throw new BadRequestException('No customer IDs provided');
+
+    const customers = await this.prisma.customer.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, user_id: true }
+    });
+
+    const userIds = customers.map(c => c.user_id).filter(Boolean);
+
+    await this.prisma.$transaction([
+      this.prisma.customer.updateMany({
+        where: { id: { in: ids } },
+        data: { is_blocked: true, status: 'blocked' }
+      }),
+      this.prisma.user.updateMany({
+        where: { id: { in: userIds } },
+        data: { status: 'blocked' }
+      })
+    ]);
+
+    for (const customer of customers) {
+      await this.activityLog.create({
+        user_id: adminId,
+        action: 'BLOCK_CUSTOMER',
+        entity_type: 'customer',
+        entity_id: customer.id,
+      });
+    }
+
+    return {
+      success: true,
+      message: `${ids.length} customers blocked successfully`,
+    };
+  }
+
   async exportCustomers(res: any, adminUserId: string) {
     const customers = await this.prisma.customer.findMany({
       include: {
